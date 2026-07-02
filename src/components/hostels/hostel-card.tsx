@@ -56,9 +56,11 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
               </div>
             )}
 
-            <div className="absolute right-3 top-3">
-              <PriceTag amount={hostel.price} />
-            </div>
+            {hostel.priceMin != null && (
+              <div className="absolute right-3 top-3">
+                <PriceTag amount={hostel.priceMin} max={hostel.priceMax ?? undefined} />
+              </div>
+            )}
 
             <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
               <Badge variant={availability.variant} size="sm">

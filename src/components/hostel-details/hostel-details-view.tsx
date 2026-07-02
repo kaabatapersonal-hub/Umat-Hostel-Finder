@@ -12,10 +12,10 @@ import { ImageGallery } from "./image-gallery";
 import { HeaderBlock } from "./header-block";
 import { AvailabilityBlock } from "./availability-block";
 import { FacilitiesGrid } from "./facilities-grid";
-import { RoomTypeGallery } from "./room-type-gallery";
+import { RoomTypeBreakdown } from "./room-type-breakdown";
 import { WhatsappGroupBanner } from "./whatsapp-group-banner";
 import { ReviewsPlaceholder } from "./reviews-placeholder";
-import { ContactFab } from "./contact-fab";
+import { ContactBar } from "./contact-bar";
 import { DetailsSkeleton } from "./details-skeleton";
 
 export interface HostelDetailsViewProps {
@@ -79,8 +79,6 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
     );
   }
 
-  const hasRoomImages = Object.values(hostel.roomImages).some((imgs) => (imgs?.length ?? 0) > 0);
-
   return (
     <div className="flex flex-col pb-8">
       <ImageGallery images={hostel.images} alt={hostel.name} />
@@ -93,10 +91,10 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
       >
         <HeaderBlock
           name={hostel.name}
-          price={hostel.price}
+          priceMin={hostel.priceMin}
+          priceMax={hostel.priceMax}
           location={hostel.location}
           distanceText={hostel.distanceText}
-          roomType={hostel.roomType}
           ratingAvg={hostel.ratingAvg}
           ratingCount={hostel.ratingCount}
         />
@@ -115,14 +113,14 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
 
         <FacilitiesGrid facilities={hostel.facilities} />
 
-        {hasRoomImages && <RoomTypeGallery roomImages={hostel.roomImages} />}
+        <RoomTypeBreakdown roomTypes={hostel.roomTypes} />
 
         {hostel.whatsappGroup && <WhatsappGroupBanner whatsappGroupUrl={hostel.whatsappGroup} />}
 
         <ReviewsPlaceholder ratingAvg={hostel.ratingAvg} ratingCount={hostel.ratingCount} />
       </motion.div>
 
-      <ContactFab hostelName={hostel.name} contact={hostel.contact} />
+      <ContactBar hostelName={hostel.name} whatsappNumber={hostel.contact} callNumber={hostel.callNumber} />
     </div>
   );
 }

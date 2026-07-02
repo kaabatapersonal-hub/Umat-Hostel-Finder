@@ -51,17 +51,18 @@ export interface Database {
           id: string;
           owner_id: string | null;
           name: string;
-          price: number;
+          room_types: Json;
+          price_min: number | null;
+          price_max: number | null;
           location: string;
           distance_text: string | null;
           latitude: number | null;
           longitude: number | null;
           description: string | null;
           images: string[];
-          room_images: Json;
           facilities: string[];
-          room_type: string | null;
           contact: string;
+          call_number: string | null;
           whatsapp_group: string | null;
           tags: string[];
           availability: string;
@@ -78,17 +79,20 @@ export interface Database {
           id?: string;
           owner_id?: string | null;
           name: string;
-          price: number;
+          // price_min/price_max are trigger-maintained from room_types —
+          // don't set them directly.
+          room_types?: Json;
+          price_min?: number | null;
+          price_max?: number | null;
           location: string;
           distance_text?: string | null;
           latitude?: number | null;
           longitude?: number | null;
           description?: string | null;
           images?: string[];
-          room_images?: Json;
           facilities?: string[];
-          room_type?: string | null;
           contact: string;
+          call_number?: string | null;
           whatsapp_group?: string | null;
           tags?: string[];
           availability?: string;
@@ -105,17 +109,18 @@ export interface Database {
           id?: string;
           owner_id?: string | null;
           name?: string;
-          price?: number;
+          room_types?: Json;
+          price_min?: number | null;
+          price_max?: number | null;
           location?: string;
           distance_text?: string | null;
           latitude?: number | null;
           longitude?: number | null;
           description?: string | null;
           images?: string[];
-          room_images?: Json;
           facilities?: string[];
-          room_type?: string | null;
           contact?: string;
+          call_number?: string | null;
           whatsapp_group?: string | null;
           tags?: string[];
           availability?: string;
@@ -480,7 +485,8 @@ export interface Database {
         Returns: {
           id: string;
           name: string;
-          price: number;
+          price_min: number | null;
+          price_max: number | null;
           location: string;
           distance_text: string | null;
           images: string[];
@@ -504,8 +510,11 @@ export interface Database {
 // The generated Database type models these columns as plain `string`
 // (Postgres CHECK constraints aren't reflected as TS literal unions), so use
 // these when you want compile-time narrowing in app code.
+// Room type keys live in lib/room-types.ts (RoomTypeKey) since, as of
+// Session 4.5, hostels.room_types is a jsonb array — not a plain enum
+// column — and the per-element shape is an application concern, not a
+// generated-database-types one.
 export type Availability = "available" | "filling" | "full";
-export type RoomType = "single" | "double" | "triple" | "quad";
 export type ProfileRole = "student" | "admin";
 export type SubmissionStatus = "pending" | "approved" | "rejected";
 export type RoommateRequestStatus = "pending" | "accepted" | "declined";
