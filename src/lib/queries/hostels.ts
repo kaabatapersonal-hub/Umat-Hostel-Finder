@@ -104,3 +104,82 @@ export async function getHostels(
 
   return { hostels, nextCursor };
 }
+
+// The full record for the details page — everything the feed deliberately
+// left out (description, full images array, room_images, facilities, the
+// manager's contact, etc).
+export interface HostelDetails {
+  id: string;
+  ownerId: string | null;
+  name: string;
+  price: number;
+  location: string;
+  distanceText: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  description: string | null;
+  images: string[];
+  roomImages: Partial<Record<"single" | "double" | "triple" | "quad", string[]>>;
+  facilities: string[];
+  roomType: string | null;
+  contact: string;
+  whatsappGroup: string | null;
+  tags: string[];
+  availability: string;
+  availabilityUpdatedAt: string;
+  isActivelyFeatured: boolean;
+  ratingAvg: number;
+  ratingCount: number;
+}
+
+const HOSTEL_DETAILS_COLUMNS =
+  "id, owner_id, name, price, location, distance_text, latitude, longitude, description, images, room_images, facilities, room_type, contact, whatsapp_group, tags, availability, availability_updated_at, featured, featured_until, rating_avg, rating_count";
+
+// Returns null when no hostel matches `id` — including a malformed id
+// (bad/tampered link), which Postgres would otherwise reject with a
+// 22P02 "invalid input syntax for uuid" error. Both cases mean the same
+// thing to the UI: show the not-found state, not a retryable error.
+export async function getHostelById(
+  supabase: SupabaseClient<Database>,
+  id: string
+): Promise<HostelDetails | null> {
+  const { data, error } = await supabase
+    .from("hostels")
+    .select(HOSTEL_DETAILS_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "22P02") return null;
+    throw error;
+  }
+  if (!data) return null;
+
+  const roomImages = (data.room_images ?? {}) as HostelDetails["roomImages"];
+  const now = Date.now();
+  const featuredUntil = data.featured_until ? new Date(data.featured_until).getTime() : null;
+
+  return {
+    id: data.id,
+    ownerId: data.owner_id,
+    name: data.name,
+    price: data.price,
+    location: data.location,
+    distanceText: data.distance_text,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    description: data.description,
+    images: data.images ?? [],
+    roomImages,
+    facilities: data.facilities ?? [],
+    roomType: data.room_type,
+    contact: data.contact,
+    whatsappGroup: data.whatsapp_group,
+    tags: data.tags ?? [],
+    availability: data.availability,
+    availabilityUpdatedAt: data.availability_updated_at,
+    isActivelyFeatured: data.featured && (featuredUntil === null || featuredUntil > now),
+    ratingAvg: data.rating_avg,
+    ratingCount: data.rating_count,
+  };
+}

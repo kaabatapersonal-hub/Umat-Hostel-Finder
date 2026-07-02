@@ -1,0 +1,110 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { motion } from "framer-motion";
+import { ArrowLeft, Heart, Building2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export interface ImageGalleryProps {
+  images: string[];
+  alt: string;
+}
+
+export function ImageGallery({ images, alt }: ImageGalleryProps) {
+  const router = useRouter();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  // TODO(Session 6): read real saved state for the signed-in user and
+  // persist toggles to saved_hostels. If signed out, tapping should trigger
+  // the sign-in prompt instead of toggling local state.
+  const [saved, setSaved] = useState(false);
+
+  const hasImages = images.length > 0;
+
+  function handleScroll() {
+    const node = scrollRef.current;
+    if (!node || node.clientWidth === 0) return;
+    setActiveIndex(Math.round(node.scrollLeft / node.clientWidth));
+  }
+
+  function scrollToIndex(index: number) {
+    const node = scrollRef.current;
+    if (!node) return;
+    node.scrollTo({ left: index * node.clientWidth, behavior: "smooth" });
+  }
+
+  return (
+    <div className="relative aspect-[4/3] w-full bg-brand-50 sm:aspect-video">
+      {hasImages ? (
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {images.map((src, i) => (
+            <div key={src + i} className="relative h-full w-full shrink-0 snap-center">
+              <Image
+                src={src}
+                alt={`${alt} — photo ${i + 1}`}
+                fill
+                sizes="100vw"
+                className="object-cover"
+                priority={i === 0}
+                loading={i === 0 ? undefined : "lazy"}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <Building2 className="size-16 text-brand-800/40" strokeWidth={1.25} />
+        </div>
+      )}
+
+      <button
+        type="button"
+        aria-label="Go back"
+        onClick={() => router.back()}
+        className="absolute left-3 top-3 flex size-10 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
+      >
+        <ArrowLeft className="size-5" />
+      </button>
+
+      <motion.button
+        type="button"
+        aria-label={saved ? "Remove from saved" : "Save hostel"}
+        aria-pressed={saved}
+        onClick={() => setSaved((prev) => !prev)}
+        whileTap={{ scale: [1, 1.25, 1] }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        className="absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
+      >
+        <Heart className={cn("size-5", saved && "fill-gold-500 text-gold-500")} />
+      </motion.button>
+
+      {hasImages && images.length > 1 && (
+        <>
+          <div className="absolute right-3 bottom-3 rounded-pill bg-ink-900/50 px-2.5 py-1 text-caption text-white backdrop-blur-sm">
+            {activeIndex + 1} / {images.length}
+          </div>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`Go to photo ${i + 1}`}
+                onClick={() => scrollToIndex(i)}
+                className={cn(
+                  "h-1.5 rounded-pill transition-all",
+                  i === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                )}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
