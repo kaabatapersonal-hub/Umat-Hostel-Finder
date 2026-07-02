@@ -464,6 +464,36 @@ export interface Database {
         Args: { p_hostel_id: string };
         Returns: undefined;
       };
+      get_hostel_feed: {
+        Args: {
+          p_search?: string | null;
+          p_near_campus?: boolean;
+          p_under_budget?: boolean;
+          p_available_now?: boolean;
+          p_featured_only?: boolean;
+          p_en_suite?: boolean;
+          p_cursor_featured?: boolean | null;
+          p_cursor_created_at?: string | null;
+          p_cursor_id?: string | null;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          price: number;
+          location: string;
+          distance_text: string | null;
+          images: string[];
+          tags: string[];
+          availability: string;
+          rating_avg: number;
+          rating_count: number;
+          featured: boolean;
+          featured_until: string | null;
+          created_at: string;
+          is_actively_featured: boolean;
+        }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
