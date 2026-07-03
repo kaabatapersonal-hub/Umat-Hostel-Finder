@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 import { parseRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
 import { parseUploadedImages, type UploadedImage } from "@/lib/images";
+import type { EditableHostelFields } from "@/lib/hostel-fields";
 
 export interface HostelCard {
   id: string;
@@ -137,10 +138,11 @@ export interface HostelDetails {
   isActivelyFeatured: boolean;
   ratingAvg: number;
   ratingCount: number;
+  hasPendingEdit: boolean;
 }
 
 const HOSTEL_DETAILS_COLUMNS =
-  "id, owner_id, name, room_types, price_min, price_max, location, distance_text, latitude, longitude, description, images, facilities, contact, call_number, whatsapp_group, tags, availability, availability_updated_at, featured, featured_until, rating_avg, rating_count";
+  "id, owner_id, name, room_types, price_min, price_max, location, distance_text, latitude, longitude, description, images, facilities, contact, call_number, whatsapp_group, tags, availability, availability_updated_at, featured, featured_until, rating_avg, rating_count, has_pending_edit";
 
 // Returns null when no hostel matches `id` — including a malformed id
 // (bad/tampered link), which Postgres would otherwise reject with a
@@ -189,5 +191,65 @@ export async function getHostelById(
     isActivelyFeatured: data.featured && (featuredUntil === null || featuredUntil > now),
     ratingAvg: data.rating_avg,
     ratingCount: data.rating_count,
+    hasPendingEdit: data.has_pending_edit,
   };
+}
+
+export interface OwnedHostelSummary {
+  id: string;
+  name: string;
+  hasPendingEdit: boolean;
+}
+
+// Session 8.5: the owner-side entry point for "Edit listing" on Profile —
+// every live hostel this user owns, plus whether an edit request is
+// already sitting in the pending buffer for it.
+export async function getMyOwnedHostels(
+  supabase: SupabaseClient<Database>,
+  userId: string
+): Promise<OwnedHostelSummary[]> {
+  const { data, error } = await supabase
+    .from("hostels")
+    .select("id, name, has_pending_edit")
+    .eq("owner_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({ id: row.id, name: row.name, hasPendingEdit: row.has_pending_edit }));
+}
+
+// The only way an owner can affect a live hostel row: propose a full
+// replacement record into the pending_changes buffer via the
+// submit_pending_edit() RPC (see
+// supabase/migrations/20260703170944_hostel_pending_edit_flow.sql). There
+// is deliberately no direct `.update()` path here -- Session 8.5 removed
+// hostels' owner UPDATE policy entirely, so a direct update would just
+// fail RLS.
+export async function submitPendingEdit(
+  supabase: SupabaseClient<Database>,
+  hostelId: string,
+  fields: EditableHostelFields
+): Promise<void> {
+  const pendingChanges = {
+    name: fields.name,
+    location: fields.location,
+    distance_text: fields.distanceText,
+    description: fields.description,
+    room_types: fields.roomTypes,
+    images: fields.images,
+    facilities: fields.facilities,
+    contact: fields.contact,
+    call_number: fields.callNumber,
+    latitude: fields.latitude,
+    longitude: fields.longitude,
+    tags: fields.tags,
+  };
+
+  const { error } = await supabase.rpc("submit_pending_edit", {
+    p_hostel_id: hostelId,
+    p_pending_changes: pendingChanges as unknown as Json,
+  });
+
+  if (error) throw error;
 }

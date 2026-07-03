@@ -73,6 +73,11 @@ export interface Database {
           is_paid: boolean;
           rating_avg: number;
           rating_count: number;
+          // The Session 8.5 edit-request buffer — null when no edit is
+          // pending. Same snake_case shape as this row's own editable
+          // columns; never read directly by student-facing UI.
+          pending_changes: Json;
+          has_pending_edit: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -103,6 +108,8 @@ export interface Database {
           is_paid?: boolean;
           rating_avg?: number;
           rating_count?: number;
+          pending_changes?: Json;
+          has_pending_edit?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -131,6 +138,8 @@ export interface Database {
           is_paid?: boolean;
           rating_avg?: number;
           rating_count?: number;
+          pending_changes?: Json;
+          has_pending_edit?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -481,6 +490,14 @@ export interface Database {
       };
       report_review: {
         Args: { p_review_id: string };
+        Returns: undefined;
+      };
+      submit_pending_edit: {
+        Args: { p_hostel_id: string; p_pending_changes: Json };
+        Returns: undefined;
+      };
+      apply_pending_changes: {
+        Args: { p_hostel_id: string };
         Returns: undefined;
       };
       get_hostel_feed: {

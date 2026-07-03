@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal, Building2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,6 +10,7 @@ import { FilterChips } from "./filter-chips";
 import { HostelCard } from "./hostel-card";
 import { useHostels } from "@/hooks/use-hostels";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useAuth } from "@/providers/auth-provider";
 import {
   DEFAULT_FILTERS,
   hasActiveFilters,
@@ -20,6 +22,8 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
   const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState<HostelFilters>(DEFAULT_FILTERS);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
+  const router = useRouter();
+  const { requireAuth } = useAuth();
 
   const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useHostels({
     search: debouncedSearch,
@@ -81,7 +85,12 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
             <span className="label text-caption text-gold-500">UMaT · Tarkwa</span>
             <h1 className="font-display text-display-lg text-white">Find your next hostel</h1>
           </div>
-          <Button variant="accent" size="sm" className="mt-1 shrink-0">
+          <Button
+            variant="accent"
+            size="sm"
+            className="mt-1 shrink-0"
+            onClick={() => requireAuth(() => router.push("/submit"))}
+          >
             Submit Hostel
           </Button>
         </div>

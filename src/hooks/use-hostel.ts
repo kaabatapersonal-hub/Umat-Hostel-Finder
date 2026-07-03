@@ -13,15 +13,19 @@ interface UseHostelOptions {
   // HostelDetails -> server-rendered data, shown immediately and revalidated
   //   in the background.
   initialData?: HostelDetails | null;
+  // Set false to skip the fetch entirely (e.g. the edit-listing flow only
+  // has a hostelId some of the time, depending on query params present).
+  enabled?: boolean;
 }
 
-export function useHostel(id: string, { initialData }: UseHostelOptions = {}) {
+export function useHostel(id: string, { initialData, enabled = true }: UseHostelOptions = {}) {
   const supabase = useMemo(() => createClient(), []);
 
   return useQuery({
     queryKey: ["hostel", id],
     queryFn: () => getHostelById(supabase, id),
     initialData,
+    enabled,
     staleTime: 60_000,
     retry: 2,
   });

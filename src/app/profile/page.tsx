@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { FileText, Heart, LogOut, ShieldCheck, UserCircle2 } from "lucide-react";
+import { FileText, Heart, LogOut, Pencil, ShieldCheck, Trash2, UserCircle2, Building2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,10 @@ import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { useMySubmissions } from "@/hooks/use-my-submissions";
+import { useDeleteSubmission } from "@/hooks/use-delete-submission";
+import { useMyOwnedHostels } from "@/hooks/use-my-owned-hostels";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
+import type { SubmissionSummary } from "@/lib/queries/submissions";
 
 const SUBMISSION_STATUS_CONFIG: Record<string, { label: string; variant: "filling" | "available" | "full" }> = {
   pending: { label: "Pending", variant: "filling" },
@@ -19,10 +23,65 @@ const SUBMISSION_STATUS_CONFIG: Record<string, { label: string; variant: "fillin
   rejected: { label: "Rejected", variant: "full" },
 };
 
+function SubmissionRow({ submission }: { submission: SubmissionSummary }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteSubmission = useDeleteSubmission();
+  const status = SUBMISSION_STATUS_CONFIG[submission.status] ?? SUBMISSION_STATUS_CONFIG.pending;
+  const isPending = submission.status === "pending";
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-line bg-surface p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="line-clamp-1 text-body-strong text-ink-900">{submission.name}</span>
+          <span className="text-caption text-ink-500">{formatRelativeTime(submission.createdAt)}</span>
+        </div>
+        <Badge variant={status.variant}>{status.label}</Badge>
+      </div>
+
+      {isPending && (
+        <div className="flex items-center gap-2">
+          {confirmingDelete ? (
+            <>
+              <span className="flex-1 text-body-sm text-ink-500">Withdraw this submission?</span>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => deleteSubmission.mutate(submission.id)}
+                loading={deleteSubmission.isPending}
+                className="border-danger text-danger"
+              >
+                Withdraw
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href={`/submit?submissionId=${submission.id}`}>
+                <Button variant="ghost" size="sm">
+                  <Pencil className="size-3.5" />
+                  Edit
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
+                <Trash2 className="size-3.5" />
+                Withdraw
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { user, profile, loading, requireAuth, signOut } = useAuth();
   const { data: saved = [], isPending: savedPending } = useSavedHostels();
   const { data: submissions = [], isPending: submissionsPending } = useMySubmissions();
+  const { data: ownedHostels = [], isPending: ownedPending } = useMyOwnedHostels();
 
   if (loading) {
     return (
@@ -84,6 +143,40 @@ export default function ProfilePage() {
         </Button>
       </Link>
 
+      {ownedHostels.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-h1 text-ink-900">My Listings</h2>
+          {ownedPending ? (
+            <SkeletonLine className="h-14 w-full rounded-md" />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {ownedHostels.map((hostel) => (
+                <div
+                  key={hostel.id}
+                  className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <Building2 className="size-4 shrink-0 text-brand-800" />
+                    <span className="line-clamp-1 text-body-strong text-ink-900">{hostel.name}</span>
+                    {hostel.hasPendingEdit && (
+                      <Badge variant="filling" size="sm">
+                        Edit pending
+                      </Badge>
+                    )}
+                  </div>
+                  <Link href={`/submit?hostelId=${hostel.id}`} className="shrink-0">
+                    <Button variant="ghost" size="sm">
+                      <Pencil className="size-3.5" />
+                      Edit listing
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">My Submissions</h2>
         {submissionsPending ? (
@@ -99,21 +192,9 @@ export default function ProfilePage() {
           />
         ) : (
           <div className="flex flex-col gap-2">
-            {submissions.map((submission) => {
-              const status = SUBMISSION_STATUS_CONFIG[submission.status] ?? SUBMISSION_STATUS_CONFIG.pending;
-              return (
-                <div
-                  key={submission.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface p-3"
-                >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="line-clamp-1 text-body-strong text-ink-900">{submission.name}</span>
-                    <span className="text-caption text-ink-500">{formatRelativeTime(submission.createdAt)}</span>
-                  </div>
-                  <Badge variant={status.variant}>{status.label}</Badge>
-                </div>
-              );
-            })}
+            {submissions.map((submission) => (
+              <SubmissionRow key={submission.id} submission={submission} />
+            ))}
           </div>
         )}
       </section>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/ui/image-uploader";
@@ -13,10 +13,13 @@ import { LocationPicker } from "./location-picker";
 import { ChipInput } from "./chip-input";
 import type { RoomTypeDraft } from "./room-type-row";
 import { useSubmitHostel } from "@/hooks/use-submit-hostel";
-import { submitHostelSchema } from "@/lib/submit-hostel";
-import { normalizePhoneNumber } from "@/lib/contact";
+import { useUpdateSubmission } from "@/hooks/use-update-submission";
+import { useSubmitPendingEdit } from "@/hooks/use-submit-pending-edit";
+import { submitHostelSchema, type SubmitHostelFormValues } from "@/lib/submit-hostel";
+import { normalizePhoneNumber, formatDisplayPhoneNumber } from "@/lib/contact";
 import { ROOM_TYPE_ORDER } from "@/lib/room-types";
 import type { UploadedImage } from "@/lib/images";
+import type { EditableHostelFields } from "@/lib/hostel-fields";
 
 interface FormErrors {
   name?: string;
@@ -27,11 +30,24 @@ interface FormErrors {
   callNumber?: string;
 }
 
+// Which record a save actually writes to. "create" is the original Session
+// 8 flow; the other two are Session 8.5's own-pending-submission edit and
+// the owner pending-edit-request buffer for an already-approved hostel.
+export type SubmitFormMode =
+  | { kind: "create" }
+  | { kind: "edit-submission"; submissionId: string }
+  | { kind: "edit-hostel"; hostelId: string; hasPendingEdit: boolean };
+
+export interface SubmitHostelFormProps {
+  mode?: SubmitFormMode;
+  initialValues?: EditableHostelFields;
+}
+
 function makeInitialRoomType(): RoomTypeDraft {
   return { key: `${Date.now()}-${Math.random().toString(36).slice(2)}`, type: ROOM_TYPE_ORDER[0], price: "", images: [] };
 }
 
-function initialState() {
+function blankState() {
   return {
     name: "",
     location: "",
@@ -49,14 +65,65 @@ function initialState() {
   };
 }
 
-export function SubmitHostelForm() {
-  const [form, setForm] = useState(initialState);
+function fieldsToFormState(fields: EditableHostelFields): ReturnType<typeof blankState> {
+  const sameAsWhatsapp = !!fields.callNumber && normalizePhoneNumber(fields.callNumber) === normalizePhoneNumber(fields.contact);
+
+  return {
+    name: fields.name,
+    location: fields.location,
+    distanceText: fields.distanceText ?? "",
+    description: fields.description ?? "",
+    roomTypes:
+      fields.roomTypes.length > 0
+        ? fields.roomTypes.map((rt) => ({
+            key: `${rt.type}-${Math.random().toString(36).slice(2)}`,
+            type: rt.type,
+            price: String(rt.price),
+            images: rt.images,
+          }))
+        : [makeInitialRoomType()],
+    images: fields.images,
+    facilities: fields.facilities,
+    whatsappNumber: formatDisplayPhoneNumber(fields.contact),
+    callNumber: sameAsWhatsapp || !fields.callNumber ? "" : formatDisplayPhoneNumber(fields.callNumber),
+    sameAsWhatsapp,
+    latitude: fields.latitude,
+    longitude: fields.longitude,
+    tags: fields.tags,
+  };
+}
+
+function buildEditableFields(data: SubmitHostelFormValues): EditableHostelFields {
+  return {
+    name: data.name,
+    location: data.location,
+    distanceText: data.distanceText,
+    description: data.description,
+    roomTypes: data.roomTypes,
+    images: data.images,
+    facilities: data.facilities,
+    contact: normalizePhoneNumber(data.whatsappNumber),
+    callNumber: data.callNumber ? normalizePhoneNumber(data.callNumber) : null,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    tags: data.tags,
+  };
+}
+
+export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: SubmitHostelFormProps) {
+  const [form, setForm] = useState(() => (initialValues ? fieldsToFormState(initialValues) : blankState()));
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const submitHostel = useSubmitHostel();
 
-  function set<K extends keyof ReturnType<typeof initialState>>(key: K, value: ReturnType<typeof initialState>[K]) {
+  const submitHostel = useSubmitHostel();
+  const updateSubmission = useUpdateSubmission();
+  const submitPendingEdit = useSubmitPendingEdit();
+
+  const isPending =
+    mode.kind === "create" ? submitHostel.isPending : mode.kind === "edit-submission" ? updateSubmission.isPending : submitPendingEdit.isPending;
+
+  function set<K extends keyof ReturnType<typeof blankState>>(key: K, value: ReturnType<typeof blankState>[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -113,61 +180,62 @@ export function SubmitHostelForm() {
     }
 
     setErrors({});
-    const data = result.data;
+    const fields = buildEditableFields(result.data);
+    const onError = (err: unknown) => {
+      setFormError(err instanceof Error ? err.message : "Something went wrong. Check your connection and try again.");
+    };
 
-    submitHostel.mutate(
-      {
-        name: data.name,
-        location: data.location,
-        distanceText: data.distanceText,
-        description: data.description,
-        roomTypes: data.roomTypes,
-        images: data.images,
-        facilities: data.facilities,
-        contact: normalizePhoneNumber(data.whatsappNumber),
-        callNumber: data.callNumber ? normalizePhoneNumber(data.callNumber) : null,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        tags: data.tags,
-      },
-      {
-        onSuccess: () => setSubmitted(true),
-        onError: (err) => {
-          setFormError(err instanceof Error ? err.message : "Something went wrong. Check your connection and try again.");
-        },
-      }
-    );
+    if (mode.kind === "create") {
+      submitHostel.mutate(fields, { onSuccess: () => setSubmitted(true), onError });
+    } else if (mode.kind === "edit-submission") {
+      updateSubmission.mutate({ id: mode.submissionId, ...fields }, { onSuccess: () => setSubmitted(true), onError });
+    } else {
+      submitPendingEdit.mutate({ hostelId: mode.hostelId, fields }, { onSuccess: () => setSubmitted(true), onError });
+    }
   }
 
   if (submitted) {
+    const copy =
+      mode.kind === "create"
+        ? {
+            title: "Submitted!",
+            description: "An admin will review your hostel and you'll be notified. This usually isn't instant.",
+          }
+        : mode.kind === "edit-submission"
+          ? { title: "Changes saved!", description: "Your updated submission is still pending admin review." }
+          : {
+              title: "Changes submitted!",
+              description: "Awaiting admin approval — your current listing stays live and unchanged until then.",
+            };
+
     return (
       <div className="flex flex-col items-center gap-4 rounded-lg bg-surface px-6 py-12 text-center shadow-card">
         <div className="flex size-14 items-center justify-center rounded-full bg-brand-50 text-brand-800">
           <CheckCircle2 className="size-7" strokeWidth={1.75} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <h2 className="font-display text-h1 text-ink-900">Submitted!</h2>
-          <p className="max-w-xs text-body text-ink-500">
-            An admin will review your hostel and you&apos;ll be notified. This usually isn&apos;t instant.
-          </p>
+          <h2 className="font-display text-h1 text-ink-900">{copy.title}</h2>
+          <p className="max-w-xs text-body text-ink-500">{copy.description}</p>
         </div>
         <div className="mt-2 flex w-full flex-col gap-2">
           <Link href="/profile">
             <Button variant="primary" size="lg" className="w-full">
-              View My Submissions
+              {mode.kind === "create" ? "View My Submissions" : "Back to Profile"}
             </Button>
           </Link>
-          <Button
-            variant="ghost"
-            size="lg"
-            className="w-full"
-            onClick={() => {
-              setForm(initialState());
-              setSubmitted(false);
-            }}
-          >
-            Submit Another Hostel
-          </Button>
+          {mode.kind === "create" && (
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                setForm(blankState());
+                setSubmitted(false);
+              }}
+            >
+              Submit Another Hostel
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -175,6 +243,13 @@ export function SubmitHostelForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-8 pb-8">
+      {mode.kind === "edit-hostel" && mode.hasPendingEdit && (
+        <div className="flex items-start gap-2.5 rounded-md bg-gold-50 p-3.5 text-body-sm text-ink-900">
+          <Info className="size-4 shrink-0 translate-y-0.5 text-gold-600" />
+          <span>You already have changes awaiting approval for this listing. Saving here replaces them.</span>
+        </div>
+      )}
+
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">Basics</h2>
         <Input label="Hostel name" value={form.name} onChange={(e) => set("name", e.target.value)} error={errors.name} />
@@ -248,8 +323,8 @@ export function SubmitHostelForm() {
 
       {formError && <p className="text-body-sm text-danger">{formError}</p>}
 
-      <Button type="submit" variant="accent" size="lg" loading={submitHostel.isPending}>
-        Submit for Review
+      <Button type="submit" variant="accent" size="lg" loading={isPending}>
+        {mode.kind === "create" ? "Submit for Review" : mode.kind === "edit-submission" ? "Save Changes" : "Submit Changes for Approval"}
       </Button>
     </form>
   );
