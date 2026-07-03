@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
-import { MapPin, Clock, Star, Building2 } from "lucide-react";
+import { MapPin, Clock, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PriceTag } from "@/components/ui/price-tag";
+import { SmartImage } from "@/components/ui/smart-image";
 import type { HostelCard as HostelCardData } from "@/lib/queries/hostels";
 
 const AVAILABILITY_CONFIG: Record<string, { label: string; variant: "available" | "filling" | "full" }> = {
@@ -40,22 +40,13 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
     >
       <Link href={`/hostel/${hostel.id}`} className="block">
         <Card interactive className="h-full">
-          <div className="relative aspect-video w-full bg-brand-50">
-            {thumbnail ? (
-              <Image
-                src={thumbnail}
-                alt={hostel.name}
-                fill
-                sizes="(min-width: 640px) 50vw, 100vw"
-                className="object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <Building2 className="size-10 text-brand-800/40" strokeWidth={1.5} />
-              </div>
-            )}
-
+          <SmartImage
+            src={thumbnail?.url ?? null}
+            blurDataURL={thumbnail?.blurDataURL}
+            alt={hostel.name}
+            sizeHint="thumbnail"
+            className="aspect-video w-full"
+          >
             {hostel.priceMin != null && (
               <div className="absolute right-3 top-3">
                 <PriceTag amount={hostel.priceMin} max={hostel.priceMax ?? undefined} />
@@ -72,7 +63,7 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
                 </Badge>
               )}
             </div>
-          </div>
+          </SmartImage>
 
           <div className="flex flex-col gap-2 p-4">
             <h3 className="font-display text-h1 text-ink-900 line-clamp-1">{hostel.name}</h3>

@@ -59,7 +59,8 @@ export interface Database {
           latitude: number | null;
           longitude: number | null;
           description: string | null;
-          images: string[];
+          // Array of { url: string, blurDataURL: string | null }.
+          images: Json;
           facilities: string[];
           contact: string;
           call_number: string | null;
@@ -89,7 +90,7 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           description?: string | null;
-          images?: string[];
+          images?: Json;
           facilities?: string[];
           contact: string;
           call_number?: string | null;
@@ -117,7 +118,7 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           description?: string | null;
-          images?: string[];
+          images?: Json;
           facilities?: string[];
           contact?: string;
           call_number?: string | null;
@@ -489,7 +490,7 @@ export interface Database {
           price_max: number | null;
           location: string;
           distance_text: string | null;
-          images: string[];
+          images: Json;
           tags: string[];
           availability: string;
           rating_avg: number;

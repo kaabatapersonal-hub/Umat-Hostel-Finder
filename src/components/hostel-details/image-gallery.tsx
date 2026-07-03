@@ -2,13 +2,14 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowLeft, Heart, Building2 } from "lucide-react";
+import { ArrowLeft, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SmartImage } from "@/components/ui/smart-image";
+import type { UploadedImage } from "@/lib/images";
 
 export interface ImageGalleryProps {
-  images: string[];
+  images: UploadedImage[];
   alt: string;
 }
 
@@ -43,24 +44,21 @@ export function ImageGallery({ images, alt }: ImageGalleryProps) {
           onScroll={handleScroll}
           className="flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {images.map((src, i) => (
-            <div key={src + i} className="relative h-full w-full shrink-0 snap-center">
-              <Image
-                src={src}
+          {images.map((image, i) => (
+            <div key={image.url + i} className="relative h-full w-full shrink-0 snap-center">
+              <SmartImage
+                src={image.url}
+                blurDataURL={image.blurDataURL}
                 alt={`${alt} — photo ${i + 1}`}
-                fill
-                sizes="100vw"
-                className="object-cover"
+                sizeHint="large"
                 priority={i === 0}
-                loading={i === 0 ? undefined : "lazy"}
+                className="h-full w-full"
               />
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <Building2 className="size-16 text-brand-800/40" strokeWidth={1.25} />
-        </div>
+        <SmartImage src={null} alt={alt} className="h-full w-full" />
       )}
 
       <button

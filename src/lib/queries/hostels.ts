@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import { sortRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
+import { parseRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
+import { parseUploadedImages, type UploadedImage } from "@/lib/images";
 
 export interface HostelCard {
   id: string;
@@ -9,7 +10,7 @@ export interface HostelCard {
   priceMax: number | null;
   location: string;
   distanceText: string | null;
-  images: string[];
+  images: UploadedImage[];
   tags: string[];
   availability: string;
   ratingAvg: number;
@@ -91,7 +92,7 @@ export async function getHostels(
     priceMax: row.price_max,
     location: row.location,
     distanceText: row.distance_text,
-    images: row.images ?? [],
+    images: parseUploadedImages(row.images),
     tags: row.tags ?? [],
     availability: row.availability,
     ratingAvg: row.rating_avg,
@@ -125,7 +126,7 @@ export interface HostelDetails {
   latitude: number | null;
   longitude: number | null;
   description: string | null;
-  images: string[];
+  images: UploadedImage[];
   facilities: string[];
   contact: string;
   callNumber: string | null;
@@ -161,7 +162,7 @@ export async function getHostelById(
   }
   if (!data) return null;
 
-  const roomTypes = sortRoomTypes((data.room_types as unknown as RoomTypeEntry[] | null) ?? []);
+  const roomTypes = parseRoomTypes(data.room_types);
   const now = Date.now();
   const featuredUntil = data.featured_until ? new Date(data.featured_until).getTime() : null;
 
@@ -177,7 +178,7 @@ export async function getHostelById(
     latitude: data.latitude,
     longitude: data.longitude,
     description: data.description,
-    images: data.images ?? [],
+    images: parseUploadedImages(data.images),
     facilities: data.facilities ?? [],
     contact: data.contact,
     callNumber: data.call_number,

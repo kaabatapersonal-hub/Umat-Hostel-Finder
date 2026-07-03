@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { PriceTag } from "@/components/ui/price-tag";
+import { SmartImage } from "@/components/ui/smart-image";
 import { roomTypeLabel, sortRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
 
 export interface RoomTypeBreakdownProps {
@@ -29,17 +29,15 @@ export function RoomTypeBreakdown({ roomTypes }: RoomTypeBreakdownProps) {
 
             {roomType.images.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
-                {roomType.images.map((src, i) => (
-                  <div key={src + i} className="relative aspect-square overflow-hidden rounded-md bg-brand-50">
-                    <Image
-                      src={src}
-                      alt={`${roomTypeLabel(roomType.type)} photo ${i + 1}`}
-                      fill
-                      sizes="33vw"
-                      className="object-cover"
-                      loading="lazy"
-                    />
-                  </div>
+                {roomType.images.map((image, i) => (
+                  <SmartImage
+                    key={image.url + i}
+                    src={image.url}
+                    blurDataURL={image.blurDataURL}
+                    alt={`${roomTypeLabel(roomType.type)} photo ${i + 1}`}
+                    sizeHint="medium"
+                    className="aspect-square rounded-md"
+                  />
                 ))}
               </div>
             )}

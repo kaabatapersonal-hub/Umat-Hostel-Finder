@@ -5,3 +5,5 @@ export * from "./badge";
 export * from "./price-tag";
 export * from "./skeleton";
 export * from "./empty-state";
+export * from "./smart-image";
+export * from "./image-uploader";
