@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PriceTag } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
+import { SaveHeartButton } from "./save-heart-button";
 import type { HostelCard as HostelCardData } from "@/lib/queries/hostels";
 
 const AVAILABILITY_CONFIG: Record<string, { label: string; variant: "available" | "filling" | "full" }> = {
@@ -47,11 +48,22 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
             sizeHint="thumbnail"
             className="aspect-video w-full"
           >
-            {hostel.priceMin != null && (
-              <div className="absolute right-3 top-3">
+            <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
+              <SaveHeartButton
+                hostel={{
+                  id: hostel.id,
+                  name: hostel.name,
+                  priceMin: hostel.priceMin,
+                  priceMax: hostel.priceMax,
+                  location: hostel.location,
+                  imageUrl: thumbnail?.url ?? null,
+                  imageBlur: thumbnail?.blurDataURL ?? null,
+                }}
+              />
+              {hostel.priceMin != null && (
                 <PriceTag amount={hostel.priceMin} max={hostel.priceMax ?? undefined} />
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
               <Badge variant={availability.variant} size="sm">

@@ -2,25 +2,22 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartImage } from "@/components/ui/smart-image";
+import { SaveHeartButton } from "@/components/hostels/save-heart-button";
 import type { UploadedImage } from "@/lib/images";
+import type { SaveableHostelInput } from "@/lib/queries/saved-hostels";
 
 export interface ImageGalleryProps {
   images: UploadedImage[];
-  alt: string;
+  hostel: SaveableHostelInput;
 }
 
-export function ImageGallery({ images, alt }: ImageGalleryProps) {
+export function ImageGallery({ images, hostel }: ImageGalleryProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  // TODO(Session 6): read real saved state for the signed-in user and
-  // persist toggles to saved_hostels. If signed out, tapping should trigger
-  // the sign-in prompt instead of toggling local state.
-  const [saved, setSaved] = useState(false);
 
   const hasImages = images.length > 0;
 
@@ -49,7 +46,7 @@ export function ImageGallery({ images, alt }: ImageGalleryProps) {
               <SmartImage
                 src={image.url}
                 blurDataURL={image.blurDataURL}
-                alt={`${alt} — photo ${i + 1}`}
+                alt={`${hostel.name} — photo ${i + 1}`}
                 sizeHint="large"
                 priority={i === 0}
                 className="h-full w-full"
@@ -58,7 +55,7 @@ export function ImageGallery({ images, alt }: ImageGalleryProps) {
           ))}
         </div>
       ) : (
-        <SmartImage src={null} alt={alt} className="h-full w-full" />
+        <SmartImage src={null} alt={hostel.name} className="h-full w-full" />
       )}
 
       <button
@@ -70,17 +67,7 @@ export function ImageGallery({ images, alt }: ImageGalleryProps) {
         <ArrowLeft className="size-5" />
       </button>
 
-      <motion.button
-        type="button"
-        aria-label={saved ? "Remove from saved" : "Save hostel"}
-        aria-pressed={saved}
-        onClick={() => setSaved((prev) => !prev)}
-        whileTap={{ scale: [1, 1.25, 1] }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
-      >
-        <Heart className={cn("size-5", saved && "fill-gold-500 text-gold-500")} />
-      </motion.button>
+      <SaveHeartButton hostel={hostel} className="absolute right-3 top-3 size-10" />
 
       {hasImages && images.length > 1 && (
         <>

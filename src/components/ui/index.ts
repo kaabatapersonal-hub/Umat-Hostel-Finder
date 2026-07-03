@@ -7,3 +7,4 @@ export * from "./skeleton";
 export * from "./empty-state";
 export * from "./smart-image";
 export * from "./image-uploader";
+export * from "./sheet";

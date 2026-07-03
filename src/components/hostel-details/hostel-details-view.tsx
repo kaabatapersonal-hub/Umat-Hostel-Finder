@@ -81,7 +81,18 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
 
   return (
     <div className="flex flex-col pb-8">
-      <ImageGallery images={hostel.images} alt={hostel.name} />
+      <ImageGallery
+        images={hostel.images}
+        hostel={{
+          id: hostel.id,
+          name: hostel.name,
+          priceMin: hostel.priceMin,
+          priceMax: hostel.priceMax,
+          location: hostel.location,
+          imageUrl: hostel.images[0]?.url ?? null,
+          imageBlur: hostel.images[0]?.blurDataURL ?? null,
+        }}
+      />
 
       <motion.div
         initial={isFirstPaintRef.current ? false : { opacity: 0, y: 8 }}

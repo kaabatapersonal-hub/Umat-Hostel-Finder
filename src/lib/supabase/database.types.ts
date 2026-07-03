@@ -278,9 +278,11 @@ export interface Database {
           user_id: string;
           hostel_id: string;
           hostel_name: string | null;
-          hostel_price: number | null;
+          hostel_price_min: number | null;
+          hostel_price_max: number | null;
           hostel_location: string | null;
-          hostel_image: string | null;
+          hostel_image_url: string | null;
+          hostel_image_blur: string | null;
           created_at: string;
         };
         Insert: {
@@ -288,9 +290,11 @@ export interface Database {
           user_id: string;
           hostel_id: string;
           hostel_name?: string | null;
-          hostel_price?: number | null;
+          hostel_price_min?: number | null;
+          hostel_price_max?: number | null;
           hostel_location?: string | null;
-          hostel_image?: string | null;
+          hostel_image_url?: string | null;
+          hostel_image_blur?: string | null;
           created_at?: string;
         };
         Update: {
@@ -298,9 +302,11 @@ export interface Database {
           user_id?: string;
           hostel_id?: string;
           hostel_name?: string | null;
-          hostel_price?: number | null;
+          hostel_price_min?: number | null;
+          hostel_price_max?: number | null;
           hostel_location?: string | null;
-          hostel_image?: string | null;
+          hostel_image_url?: string | null;
+          hostel_image_blur?: string | null;
           created_at?: string;
         };
         Relationships: [
