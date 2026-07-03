@@ -14,7 +14,7 @@ import { AvailabilityBlock } from "./availability-block";
 import { FacilitiesGrid } from "./facilities-grid";
 import { RoomTypeBreakdown } from "./room-type-breakdown";
 import { WhatsappGroupBanner } from "./whatsapp-group-banner";
-import { ReviewsPlaceholder } from "./reviews-placeholder";
+import { ReviewsSection } from "@/components/reviews/reviews-section";
 import { ContactBar } from "./contact-bar";
 import { DetailsSkeleton } from "./details-skeleton";
 
@@ -128,7 +128,12 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
 
         {hostel.whatsappGroup && <WhatsappGroupBanner whatsappGroupUrl={hostel.whatsappGroup} />}
 
-        <ReviewsPlaceholder ratingAvg={hostel.ratingAvg} ratingCount={hostel.ratingCount} />
+        <ReviewsSection
+          hostelId={hostel.id}
+          hostelOwnerId={hostel.ownerId}
+          ratingAvg={hostel.ratingAvg}
+          ratingCount={hostel.ratingCount}
+        />
       </motion.div>
 
       <ContactBar hostelName={hostel.name} whatsappNumber={hostel.contact} callNumber={hostel.callNumber} />

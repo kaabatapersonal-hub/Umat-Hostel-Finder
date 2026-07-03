@@ -476,6 +476,10 @@ export interface Database {
         Args: { p_hostel_id: string };
         Returns: undefined;
       };
+      report_review: {
+        Args: { p_review_id: string };
+        Returns: undefined;
+      };
       get_hostel_feed: {
         Args: {
           p_search?: string | null;
