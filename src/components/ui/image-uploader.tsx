@@ -7,7 +7,7 @@ import { ImagePlus, X, RotateCcw, ChevronLeft, ChevronRight, AlertCircle, Loader
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { compressImageForUpload } from "@/lib/image-compression";
-import { uploadImageToStorage, type StorageBucket } from "@/lib/storage-upload";
+import { uploadImageToStorage, deleteImageFromStorage, type StorageBucket } from "@/lib/storage-upload";
 import type { UploadedImage } from "@/lib/images";
 
 interface UploadSlot {
@@ -126,7 +126,18 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
   }
 
   function removeSlot(key: string) {
+    const slot = slots.find((s) => s.key === key);
     setSlots((prev) => prev.filter((s) => s.key !== key));
+
+    // The main fix for Session 5's tracked orphan-cleanup loose end: a
+    // slot that finished uploading has a real Storage object behind it, so
+    // removing it from the form must also delete it, not just drop it from
+    // the array. Best-effort -- a failed delete here just leaves an
+    // orphan, same as the already-accepted abandon-mid-form case.
+    if (slot?.status === "done" && slot.image) {
+      const supabase = createClient();
+      void deleteImageFromStorage(supabase, bucket, slot.image.url).catch(() => {});
+    }
   }
 
   function retrySlot(key: string) {

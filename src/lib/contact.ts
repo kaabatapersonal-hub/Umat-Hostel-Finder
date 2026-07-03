@@ -11,6 +11,13 @@ export function normalizePhoneNumber(raw: string): string {
   return digits;
 }
 
+// A normalized Ghanaian mobile number is always "233" + 9 digits (12
+// digits total) -- used by the Submit form to reject obviously-broken
+// numbers before they ever reach wa.me/tel: links.
+export function isValidPhoneNumber(raw: string): boolean {
+  return /^233\d{9}$/.test(normalizePhoneNumber(raw));
+}
+
 export function formatDisplayPhoneNumber(raw: string): string {
   const normalized = normalizePhoneNumber(raw);
   if (normalized.length !== 12) return raw;
