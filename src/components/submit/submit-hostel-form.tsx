@@ -15,6 +15,8 @@ import type { RoomTypeDraft } from "./room-type-row";
 import { useSubmitHostel } from "@/hooks/use-submit-hostel";
 import { useUpdateSubmission } from "@/hooks/use-update-submission";
 import { useSubmitPendingEdit } from "@/hooks/use-submit-pending-edit";
+import { useCreateHostelAdmin } from "@/hooks/use-create-hostel-admin";
+import { useUpdateHostelAdmin } from "@/hooks/use-update-hostel-admin";
 import { submitHostelSchema, type SubmitHostelFormValues } from "@/lib/submit-hostel";
 import { normalizePhoneNumber, formatDisplayPhoneNumber } from "@/lib/contact";
 import { ROOM_TYPE_ORDER } from "@/lib/room-types";
@@ -30,13 +32,17 @@ interface FormErrors {
   callNumber?: string;
 }
 
-// Which record a save actually writes to. "create" is the original Session
-// 8 flow; the other two are Session 8.5's own-pending-submission edit and
-// the owner pending-edit-request buffer for an already-approved hostel.
+// Which record a save actually writes to. "create" and the two "edit-*"
+// kinds are the Session 8/8.5 student-facing flows; "admin-create" and
+// "admin-edit" (Session 10) write directly to a live hostels row -- admin
+// already has full RLS rights, so there's no submission queue or pending
+// buffer in either direction.
 export type SubmitFormMode =
   | { kind: "create" }
   | { kind: "edit-submission"; submissionId: string }
-  | { kind: "edit-hostel"; hostelId: string; hasPendingEdit: boolean };
+  | { kind: "edit-hostel"; hostelId: string; hasPendingEdit: boolean }
+  | { kind: "admin-create" }
+  | { kind: "admin-edit"; hostelId: string };
 
 export interface SubmitHostelFormProps {
   mode?: SubmitFormMode;
@@ -47,10 +53,10 @@ function makeInitialRoomType(): RoomTypeDraft {
   return { key: `${Date.now()}-${Math.random().toString(36).slice(2)}`, type: ROOM_TYPE_ORDER[0], price: "", images: [] };
 }
 
-function blankState() {
+function blankState(overrides?: { location?: string }) {
   return {
     name: "",
-    location: "",
+    location: overrides?.location ?? "",
     distanceText: "",
     description: "",
     roomTypes: [makeInitialRoomType()] as RoomTypeDraft[],
@@ -119,9 +125,19 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
   const submitHostel = useSubmitHostel();
   const updateSubmission = useUpdateSubmission();
   const submitPendingEdit = useSubmitPendingEdit();
+  const createHostelAdmin = useCreateHostelAdmin();
+  const updateHostelAdmin = useUpdateHostelAdmin();
 
   const isPending =
-    mode.kind === "create" ? submitHostel.isPending : mode.kind === "edit-submission" ? updateSubmission.isPending : submitPendingEdit.isPending;
+    mode.kind === "create"
+      ? submitHostel.isPending
+      : mode.kind === "edit-submission"
+        ? updateSubmission.isPending
+        : mode.kind === "edit-hostel"
+          ? submitPendingEdit.isPending
+          : mode.kind === "admin-create"
+            ? createHostelAdmin.isPending
+            : updateHostelAdmin.isPending;
 
   function set<K extends keyof ReturnType<typeof blankState>>(key: K, value: ReturnType<typeof blankState>[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -189,8 +205,12 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
       submitHostel.mutate(fields, { onSuccess: () => setSubmitted(true), onError });
     } else if (mode.kind === "edit-submission") {
       updateSubmission.mutate({ id: mode.submissionId, ...fields }, { onSuccess: () => setSubmitted(true), onError });
-    } else {
+    } else if (mode.kind === "edit-hostel") {
       submitPendingEdit.mutate({ hostelId: mode.hostelId, fields }, { onSuccess: () => setSubmitted(true), onError });
+    } else if (mode.kind === "admin-create") {
+      createHostelAdmin.mutate(fields, { onSuccess: () => setSubmitted(true), onError });
+    } else {
+      updateHostelAdmin.mutate({ id: mode.hostelId, fields }, { onSuccess: () => setSubmitted(true), onError });
     }
   }
 
@@ -203,10 +223,18 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
           }
         : mode.kind === "edit-submission"
           ? { title: "Changes saved!", description: "Your updated submission is still pending admin review." }
-          : {
-              title: "Changes submitted!",
-              description: "Awaiting admin approval — your current listing stays live and unchanged until then.",
-            };
+          : mode.kind === "edit-hostel"
+            ? {
+                title: "Changes submitted!",
+                description: "Awaiting admin approval — your current listing stays live and unchanged until then.",
+              }
+            : mode.kind === "admin-create"
+              ? { title: "Hostel added!", description: "It's live immediately — students can find it right now." }
+              : { title: "Saved!", description: "The live listing has been updated." };
+
+    const isAdminMode = mode.kind === "admin-create" || mode.kind === "admin-edit";
+    const primaryHref = isAdminMode ? "/admin/hostels" : "/profile";
+    const primaryLabel = isAdminMode ? "Back to Hostels" : mode.kind === "create" ? "View My Submissions" : "Back to Profile";
 
     return (
       <div className="flex flex-col items-center gap-4 rounded-lg bg-surface px-6 py-12 text-center shadow-card">
@@ -218,9 +246,22 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
           <p className="max-w-xs text-body text-ink-500">{copy.description}</p>
         </div>
         <div className="mt-2 flex w-full flex-col gap-2">
-          <Link href="/profile">
-            <Button variant="primary" size="lg" className="w-full">
-              {mode.kind === "create" ? "View My Submissions" : "Back to Profile"}
+          {mode.kind === "admin-create" && (
+            <Button
+              variant="accent"
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                setForm(blankState({ location: form.location }));
+                setSubmitted(false);
+              }}
+            >
+              Save & Add Another
+            </Button>
+          )}
+          <Link href={primaryHref}>
+            <Button variant={mode.kind === "admin-create" ? "secondary" : "primary"} size="lg" className="w-full">
+              {primaryLabel}
             </Button>
           </Link>
           {mode.kind === "create" && (
@@ -324,7 +365,15 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
       {formError && <p className="text-body-sm text-danger">{formError}</p>}
 
       <Button type="submit" variant="accent" size="lg" loading={isPending}>
-        {mode.kind === "create" ? "Submit for Review" : mode.kind === "edit-submission" ? "Save Changes" : "Submit Changes for Approval"}
+        {mode.kind === "create"
+          ? "Submit for Review"
+          : mode.kind === "edit-submission"
+            ? "Save Changes"
+            : mode.kind === "edit-hostel"
+              ? "Submit Changes for Approval"
+              : mode.kind === "admin-create"
+                ? "Add Hostel"
+                : "Save Changes"}
       </Button>
     </form>
   );

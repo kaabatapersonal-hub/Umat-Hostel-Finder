@@ -3,7 +3,7 @@ import { Sora, Inter } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
-import { AppShell } from "@/components/layout/app-shell";
+import { ConditionalAppShell } from "@/components/layout/conditional-app-shell";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -38,7 +38,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-surface-muted text-ink-900">
         <QueryProvider>
           <AuthProvider>
-            <AppShell>{children}</AppShell>
+            <ConditionalAppShell>{children}</ConditionalAppShell>
           </AuthProvider>
         </QueryProvider>
       </body>
