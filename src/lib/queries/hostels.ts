@@ -3,6 +3,10 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { parseRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
 import { parseUploadedImages, type UploadedImage } from "@/lib/images";
 import type { EditableHostelFields } from "@/lib/hostel-fields";
+import { haversineDistanceKm } from "@/lib/geo";
+import { UMAT_CENTER } from "@/lib/map-constants";
+
+const UMAT_LATLNG = { lat: UMAT_CENTER[0], lng: UMAT_CENTER[1] };
 
 export interface HostelCard {
   id: string;
@@ -139,6 +143,9 @@ export interface HostelDetails {
   ratingAvg: number;
   ratingCount: number;
   hasPendingEdit: boolean;
+  // Straight-line (haversine), never a routed distance -- null when the
+  // hostel has no coordinates yet. See lib/geo.ts.
+  distanceToCampusKm: number | null;
 }
 
 const HOSTEL_DETAILS_COLUMNS =
@@ -192,6 +199,10 @@ export async function getHostelById(
     ratingAvg: data.rating_avg,
     ratingCount: data.rating_count,
     hasPendingEdit: data.has_pending_edit,
+    distanceToCampusKm:
+      data.latitude != null && data.longitude != null
+        ? haversineDistanceKm(UMAT_LATLNG, { lat: data.latitude, lng: data.longitude })
+        : null,
   };
 }
 

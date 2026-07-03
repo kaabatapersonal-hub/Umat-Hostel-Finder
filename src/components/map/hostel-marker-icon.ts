@@ -34,3 +34,21 @@ const featuredIcon = L.divIcon({
 export function hostelMarkerIcon(isFeatured: boolean): L.DivIcon {
   return isFeatured ? featuredIcon : regularIcon;
 }
+
+// The "near here" custom point (Session 9.5, feature 6) -- a dashed target,
+// deliberately a different shape from both the teardrop hostel pins and
+// the blue "you are here" dot, so a glance never confuses the three.
+const targetSvg = `
+  <svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 3px rgba(16,33,28,0.35))">
+    <circle cx="13" cy="13" r="9.5" fill="white" fill-opacity="0.85" stroke="var(--ink-900)" stroke-width="2.5" stroke-dasharray="4 3"/>
+    <circle cx="13" cy="13" r="3" fill="var(--ink-900)"/>
+  </svg>
+`;
+
+export const customPointIcon = L.divIcon({
+  className: "",
+  html: targetSvg,
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+  popupAnchor: [0, -13],
+});

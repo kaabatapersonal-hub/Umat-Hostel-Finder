@@ -106,6 +106,9 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
           priceMax={hostel.priceMax}
           location={hostel.location}
           distanceText={hostel.distanceText}
+          distanceToCampusKm={hostel.distanceToCampusKm}
+          latitude={hostel.latitude}
+          longitude={hostel.longitude}
           ratingAvg={hostel.ratingAvg}
           ratingCount={hostel.ratingCount}
         />

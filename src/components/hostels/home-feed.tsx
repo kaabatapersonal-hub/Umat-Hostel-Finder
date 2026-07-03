@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, SlidersHorizontal, Building2, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { Search, SlidersHorizontal, Building2, AlertCircle, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
@@ -11,16 +12,14 @@ import { HostelCard } from "./hostel-card";
 import { useHostels } from "@/hooks/use-hostels";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAuth } from "@/providers/auth-provider";
-import {
-  DEFAULT_FILTERS,
-  hasActiveFilters,
-  type GetHostelsResult,
-  type HostelFilters,
-} from "@/lib/queries/hostels";
+import { useHostelFilters } from "@/hooks/use-hostel-filters";
+import { DEFAULT_FILTERS, hasActiveFilters, type GetHostelsResult } from "@/lib/queries/hostels";
 
 export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
   const [searchInput, setSearchInput] = useState("");
-  const [filters, setFilters] = useState<HostelFilters>(DEFAULT_FILTERS);
+  // URL-synced (Session 9.5) so the Map tab reads/writes the exact same
+  // filter state -- see hooks/use-hostel-filters.ts.
+  const { filters, setFilters, queryString } = useHostelFilters();
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const router = useRouter();
   const { requireAuth } = useAuth();
@@ -121,6 +120,13 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
       <section className="flex flex-col gap-4 px-4 pb-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-h1 text-ink-900">Hostels near you</h2>
+          <Link
+            href={queryString ? `/map?${queryString}` : "/map"}
+            className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 text-body-sm font-medium text-brand-800 shadow-card"
+          >
+            <MapIcon className="size-4" />
+            Map
+          </Link>
         </div>
 
         {isPending ? (

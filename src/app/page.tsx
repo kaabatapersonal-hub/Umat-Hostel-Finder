@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getDefaultHostelFeed } from "@/lib/queries/hostel-feed-cached";
 import { HomeFeed } from "@/components/hostels/home-feed";
 import type { GetHostelsResult } from "@/lib/queries/hostels";
@@ -19,5 +20,12 @@ export default async function HomePage() {
     initialData = undefined;
   }
 
-  return <HomeFeed initialData={initialData} />;
+  // useHostelFilters (Session 9.5) reads the URL via useSearchParams, which
+  // Next.js requires a Suspense boundary for -- this keeps that dynamic
+  // requirement scoped to HomeFeed rather than de-opting the whole ISR page.
+  return (
+    <Suspense fallback={null}>
+      <HomeFeed initialData={initialData} />
+    </Suspense>
+  );
 }
