@@ -84,8 +84,8 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
       {/* The one brand moment: a quiet dark-to-deeper-green gradient so the
           hero reads as a considered surface, not a flat color bar. The only
           gradient in the app -- everywhere else stays flat by design. */}
-      <section className="bg-gradient-to-br from-brand-800 to-brand-900 px-4 pt-8 pb-6">
-        <div className="flex items-start justify-between gap-4">
+      <section className="bg-gradient-to-br from-brand-800 to-brand-900 px-4 pt-8 pb-6 lg:px-6">
+        <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="label text-caption text-gold-500">UMaT · Tarkwa</span>
             <h1 className="font-display text-display-lg text-white">Find your next hostel</h1>
@@ -100,7 +100,7 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
           </Button>
         </div>
 
-        <div className="mt-5 flex items-center gap-2">
+        <div className="mx-auto mt-5 flex max-w-7xl items-center gap-2">
           <div className="flex h-12 flex-1 items-center gap-2.5 rounded-md bg-surface px-3.5 shadow-card">
             <Search className="size-5 shrink-0 text-ink-300" />
             <input
@@ -114,9 +114,11 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
         </div>
       </section>
 
-      <FilterChips value={filters} onChange={setFilters} />
+      <div className="mx-auto w-full max-w-7xl">
+        <FilterChips value={filters} onChange={setFilters} />
+      </div>
 
-      <section className="flex flex-col gap-4 px-4 pb-6">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pb-6 lg:px-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-h1 text-ink-900">Hostels near you</h2>
           <Link
@@ -129,8 +131,8 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
         </div>
 
         {isPending ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-8">
+            {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
@@ -158,14 +160,15 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-8">
               {hostels.map((hostel, i) => (
                 <HostelCard key={hostel.id} hostel={hostel} index={i} animateIn={!isFirstPaintRef.current} />
               ))}
             </div>
             <div ref={sentinelRef} aria-hidden className="h-1" />
             {isFetchingNextPage && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-8">
+                <SkeletonCard />
                 <SkeletonCard />
                 <SkeletonCard />
               </div>

@@ -206,6 +206,79 @@ export async function getHostelById(
   };
 }
 
+export interface GetRelatedHostelsParams {
+  excludeId: string;
+  location: string;
+  priceMin: number | null;
+  limit?: number;
+}
+
+// Fetch enough candidates to rank properly, but never the whole table --
+// at today's (and V1-launch) hostel counts this is effectively "all of
+// them" anyway, so no pagination/RPC is needed yet. Revisit if the
+// catalog grows well past this.
+const RELATED_CANDIDATE_LIMIT = 60;
+
+function priceDistance(price: number | null, target: number | null): number {
+  if (price == null || target == null) return Number.POSITIVE_INFINITY;
+  return Math.abs(price - target);
+}
+
+// Backs both the desktop details sidebar ("More hostels") and the mobile
+// details related-feed -- same simple heuristic for both, deliberately
+// not over-engineered: same location area first, then closest by price
+// (price_min proximity), then newest. Selects only card fields, same
+// discipline as the main feed, so the resulting rows are drop-in
+// HostelCard props.
+export async function getRelatedHostels(
+  supabase: SupabaseClient<Database>,
+  { excludeId, location, priceMin, limit = 10 }: GetRelatedHostelsParams
+): Promise<HostelCard[]> {
+  const { data, error } = await supabase
+    .from("hostels")
+    .select(
+      "id, name, price_min, price_max, location, distance_text, images, tags, availability, rating_avg, rating_count, featured, featured_until, created_at"
+    )
+    .neq("id", excludeId)
+    .order("created_at", { ascending: false })
+    .limit(RELATED_CANDIDATE_LIMIT);
+
+  if (error) throw error;
+
+  const now = Date.now();
+
+  const ranked = (data ?? [])
+    .map((row) => {
+      const featuredUntil = row.featured_until ? new Date(row.featured_until).getTime() : null;
+      return {
+        card: {
+          id: row.id,
+          name: row.name,
+          priceMin: row.price_min,
+          priceMax: row.price_max,
+          location: row.location,
+          distanceText: row.distance_text,
+          images: parseUploadedImages(row.images),
+          tags: row.tags ?? [],
+          availability: row.availability,
+          ratingAvg: row.rating_avg,
+          ratingCount: row.rating_count,
+          isActivelyFeatured: row.featured && (featuredUntil === null || featuredUntil > now),
+        } satisfies HostelCard,
+        sameLocation: row.location === location ? 0 : 1,
+        priceGap: priceDistance(row.price_min, priceMin),
+        createdAt: new Date(row.created_at).getTime(),
+      };
+    })
+    .sort((a, b) => {
+      if (a.sameLocation !== b.sameLocation) return a.sameLocation - b.sameLocation;
+      if (a.priceGap !== b.priceGap) return a.priceGap - b.priceGap;
+      return b.createdAt - a.createdAt;
+    });
+
+  return ranked.slice(0, limit).map((r) => r.card);
+}
+
 export interface OwnedHostelSummary {
   id: string;
   name: string;

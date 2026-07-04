@@ -41,7 +41,7 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
   }
 
   return (
-    <div className="relative aspect-[4/3] w-full bg-brand-50 sm:aspect-video">
+    <div className="relative aspect-[4/3] w-full overflow-hidden bg-brand-50 sm:aspect-video lg:rounded-lg">
       {hasImages ? (
         <div
           ref={scrollRef}

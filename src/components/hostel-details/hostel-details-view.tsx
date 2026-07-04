@@ -17,6 +17,8 @@ import { WhatsappGroupBanner } from "./whatsapp-group-banner";
 import { ReviewsSection } from "@/components/reviews/reviews-section";
 import { ContactBar } from "./contact-bar";
 import { DetailsSkeleton } from "./details-skeleton";
+import { RelatedHostelsSidebar } from "./related-hostels-sidebar";
+import { RelatedHostelsSection } from "./related-hostels-section";
 
 export interface HostelDetailsViewProps {
   id: string;
@@ -88,65 +90,80 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
   }
 
   return (
-    <div className="flex flex-col pb-8">
-      <ImageGallery
-        images={hostel.images}
-        hostel={{
-          id: hostel.id,
-          name: hostel.name,
-          priceMin: hostel.priceMin,
-          priceMax: hostel.priceMax,
-          location: hostel.location,
-          imageUrl: hostel.images[0]?.url ?? null,
-          imageBlur: hostel.images[0]?.blurDataURL ?? null,
-        }}
-      />
+    <div className="flex flex-col pb-8 lg:pb-12">
+      {/* The "watch page" split: main content stays exactly as it's always
+          been, just capped to 2/3 width at desktop instead of stretching
+          full-bleed (better line lengths too); the sidebar is a separate
+          desktop-only surface, never appended below on mobile (that's
+          RelatedHostelsSection's job instead, further down). */}
+      <div className="lg:mx-auto lg:grid lg:max-w-7xl lg:grid-cols-3 lg:gap-8 lg:px-6 lg:pt-6">
+        <div className="lg:col-span-2">
+          <ImageGallery
+            images={hostel.images}
+            hostel={{
+              id: hostel.id,
+              name: hostel.name,
+              priceMin: hostel.priceMin,
+              priceMax: hostel.priceMax,
+              location: hostel.location,
+              imageUrl: hostel.images[0]?.url ?? null,
+              imageBlur: hostel.images[0]?.blurDataURL ?? null,
+            }}
+          />
 
-      <motion.div
-        initial={isFirstPaintRef.current ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col gap-6 px-4 py-5"
-      >
-        <HeaderBlock
-          hostelId={hostel.id}
-          name={hostel.name}
-          priceMin={hostel.priceMin}
-          priceMax={hostel.priceMax}
-          location={hostel.location}
-          distanceText={hostel.distanceText}
-          distanceToCampusKm={hostel.distanceToCampusKm}
-          latitude={hostel.latitude}
-          longitude={hostel.longitude}
-          ratingAvg={hostel.ratingAvg}
-          ratingCount={hostel.ratingCount}
-        />
+          <motion.div
+            initial={isFirstPaintRef.current ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col gap-6 px-4 py-5 lg:px-0"
+          >
+            <HeaderBlock
+              hostelId={hostel.id}
+              name={hostel.name}
+              priceMin={hostel.priceMin}
+              priceMax={hostel.priceMax}
+              location={hostel.location}
+              distanceText={hostel.distanceText}
+              distanceToCampusKm={hostel.distanceToCampusKm}
+              latitude={hostel.latitude}
+              longitude={hostel.longitude}
+              ratingAvg={hostel.ratingAvg}
+              ratingCount={hostel.ratingCount}
+            />
 
-        <AvailabilityBlock
-          availability={hostel.availability}
-          availabilityUpdatedAt={hostel.availabilityUpdatedAt}
-        />
+            <AvailabilityBlock
+              availability={hostel.availability}
+              availabilityUpdatedAt={hostel.availabilityUpdatedAt}
+            />
 
-        {hostel.description && (
-          <div className="flex flex-col gap-2">
-            <h2 className="font-display text-h1 text-ink-900">About this hostel</h2>
-            <p className="max-w-prose text-body leading-relaxed text-ink-500">{hostel.description}</p>
-          </div>
-        )}
+            {hostel.description && (
+              <div className="flex flex-col gap-2">
+                <h2 className="font-display text-h1 text-ink-900">About this hostel</h2>
+                <p className="max-w-prose text-body leading-relaxed text-ink-500">{hostel.description}</p>
+              </div>
+            )}
 
-        <FacilitiesGrid facilities={hostel.facilities} />
+            <FacilitiesGrid facilities={hostel.facilities} />
 
-        <RoomTypeBreakdown roomTypes={hostel.roomTypes} />
+            <RoomTypeBreakdown roomTypes={hostel.roomTypes} />
 
-        {hostel.whatsappGroup && <WhatsappGroupBanner whatsappGroupUrl={hostel.whatsappGroup} />}
+            {hostel.whatsappGroup && <WhatsappGroupBanner whatsappGroupUrl={hostel.whatsappGroup} />}
 
-        <ReviewsSection
-          hostelId={hostel.id}
-          hostelOwnerId={hostel.ownerId}
-          ratingAvg={hostel.ratingAvg}
-          ratingCount={hostel.ratingCount}
-        />
-      </motion.div>
+            <ReviewsSection
+              hostelId={hostel.id}
+              hostelOwnerId={hostel.ownerId}
+              ratingAvg={hostel.ratingAvg}
+              ratingCount={hostel.ratingCount}
+            />
+          </motion.div>
+        </div>
+
+        <aside className="hidden lg:sticky lg:top-6 lg:block lg:self-start">
+          <RelatedHostelsSidebar hostelId={hostel.id} location={hostel.location} priceMin={hostel.priceMin} />
+        </aside>
+      </div>
+
+      <RelatedHostelsSection hostelId={hostel.id} location={hostel.location} priceMin={hostel.priceMin} />
 
       <ContactBar hostelName={hostel.name} whatsappNumber={hostel.contact} callNumber={hostel.callNumber} />
     </div>

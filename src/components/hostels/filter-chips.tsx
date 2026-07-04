@@ -19,7 +19,7 @@ export interface FilterChipsProps {
 
 export function FilterChips({ value, onChange }: FilterChipsProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto px-4 py-4">
+    <div className="flex gap-2 overflow-x-auto px-4 py-4 lg:px-6">
       {CHIP_CONFIG.map(({ key, label }) => {
         const active = value[key];
         return (

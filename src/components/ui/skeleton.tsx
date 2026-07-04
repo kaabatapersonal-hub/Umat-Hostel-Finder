@@ -41,3 +41,18 @@ export function SkeletonRow({ className, ...props }: React.HTMLAttributes<HTMLDi
     </div>
   );
 }
+
+// Shape-matches CompactHostelRow (the desktop details sidebar's "More
+// hostels" card) -- a wider thumbnail than SkeletonRow, three lines.
+export function SkeletonCompactRow({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("flex gap-3 p-1.5", className)} {...props}>
+      <Skeleton className="aspect-video w-32 shrink-0 rounded-md" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2 py-0.5">
+        <SkeletonLine className="w-full" />
+        <SkeletonLine className="w-2/3" />
+        <SkeletonLine className="w-1/2" />
+      </div>
+    </div>
+  );
+}

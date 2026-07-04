@@ -41,51 +41,57 @@ export function ContactBar({ hostelName, whatsappNumber, callNumber }: ContactBa
   }
 
   return (
-    <div
-      className="fixed inset-x-4 z-40 flex flex-col gap-2"
-      style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}
-    >
-      <AnimatePresence>
-        {revealed && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-col gap-0.5 self-end rounded-md bg-surface px-3 py-2 text-body-sm text-ink-900 shadow-md"
-          >
-            <span>WhatsApp: {formatDisplayPhoneNumber(whatsappNumber)}</span>
-            {callNumber && <span>Call: {formatDisplayPhoneNumber(callNumber)}</span>}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    // Full-width fixed strip, but the buttons only ever occupy the same
+    // 2/3 "main column" track as the two-column desktop layout below
+    // (lg:grid-cols-3 lg:col-span-2, matching hostel-details-view.tsx) --
+    // otherwise a full-viewport-width contact bar would sit on top of the
+    // "More hostels" sidebar at desktop widths.
+    <div className="fixed inset-x-0 z-40" style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
+      <div className="mx-auto max-w-7xl px-4 lg:grid lg:grid-cols-3 lg:gap-8 lg:px-6">
+        <div className="flex flex-col gap-2 lg:col-span-2">
+          <AnimatePresence>
+            {revealed && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col gap-0.5 self-end rounded-md bg-surface px-3 py-2 text-body-sm text-ink-900 shadow-md"
+              >
+                <span>WhatsApp: {formatDisplayPhoneNumber(whatsappNumber)}</span>
+                {callNumber && <span>Call: {formatDisplayPhoneNumber(callNumber)}</span>}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      <div className="flex items-center gap-2">
-        <motion.button
-          type="button"
-          aria-label="Contact hostel manager on WhatsApp"
-          onClick={handleWhatsAppTap}
-          whileTap={{ scale: 0.97 }}
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          className="flex h-14 flex-1 items-center justify-center gap-2 rounded-pill bg-[#25D366] px-5 text-white shadow-md"
-        >
-          <MessageCircle className="size-5" />
-          <span className="text-body-strong font-semibold">{revealed ? "Open WhatsApp" : "WhatsApp"}</span>
-        </motion.button>
+          <div className="flex items-center gap-2">
+            <motion.button
+              type="button"
+              aria-label="Contact hostel manager on WhatsApp"
+              onClick={handleWhatsAppTap}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-pill bg-[#25D366] px-5 text-white shadow-md"
+            >
+              <MessageCircle className="size-5" />
+              <span className="text-body-strong font-semibold">{revealed ? "Open WhatsApp" : "WhatsApp"}</span>
+            </motion.button>
 
-        {callNumber && (
-          <motion.button
-            type="button"
-            aria-label="Call hostel manager"
-            onClick={handleCallTap}
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="flex h-14 shrink-0 items-center justify-center gap-2 rounded-pill bg-brand-800 px-5 text-white shadow-md"
-          >
-            <Phone className="size-5" />
-            <span className="text-body-strong font-semibold">Call</span>
-          </motion.button>
-        )}
+            {callNumber && (
+              <motion.button
+                type="button"
+                aria-label="Call hostel manager"
+                onClick={handleCallTap}
+                whileTap={{ scale: 0.97 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="flex h-14 shrink-0 items-center justify-center gap-2 rounded-pill bg-brand-800 px-5 text-white shadow-md"
+              >
+                <Phone className="size-5" />
+                <span className="text-body-strong font-semibold">Call</span>
+              </motion.button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

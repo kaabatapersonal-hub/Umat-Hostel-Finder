@@ -41,7 +41,11 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
       transition={{ duration: 0.28, delay: Math.min(index, 10) * 0.04, ease: [0.22, 1, 0.36, 1] }}
     >
       <Link href={`/hostel/${hostel.id}`} className="block">
-        <Card interactive className="h-full">
+        {/* Full card chrome (shadow, white surface) at 1-2 columns; at the
+            3-up desktop grid density it flattens to thumbnail + text with
+            no visible container -- the YouTube grid move -- while every
+            overlay (price pill, badges, heart) stays exactly as branded. */}
+        <Card interactive className="h-full lg:rounded-md lg:bg-transparent lg:shadow-none">
           <SmartImage
             src={thumbnailSrc(thumbnail)}
             blurDataURL={thumbnail?.blurDataURL}
@@ -82,7 +86,7 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
             </div>
           </SmartImage>
 
-          <div className="flex flex-col gap-2 p-4">
+          <div className="flex flex-col gap-2 p-4 lg:px-1 lg:py-3">
             <h3 className="font-display text-h1 text-ink-900 line-clamp-1">{hostel.name}</h3>
 
             <div className="flex items-center gap-3 text-body-sm text-ink-500">
