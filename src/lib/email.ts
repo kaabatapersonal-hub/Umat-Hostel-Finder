@@ -1,10 +1,13 @@
 import "server-only";
+import { getSiteUrl } from "./site-url";
 
 // Server-only by construction (the "server-only" import above makes this
 // module a build error if anything client-side ever imports it) -- the
 // Resend API key must never reach the browser. Called from the
 // /api/admin/submission-notify route, never directly from a client
 // component.
+
+export { getSiteUrl };
 
 export interface SendEmailResult {
   ok: boolean;
@@ -45,12 +48,6 @@ async function sendEmail({ to, subject, html }: { to: string; subject: string; h
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Unknown error sending email" };
   }
-}
-
-export function getSiteUrl(): string {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
 }
 
 function emailShell(bodyHtml: string): string {

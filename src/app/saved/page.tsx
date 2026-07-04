@@ -3,7 +3,7 @@
 import { Heart, UserCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SkeletonLine } from "@/components/ui/skeleton";
+import { SkeletonRow } from "@/components/ui/skeleton";
 import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
@@ -27,8 +27,8 @@ export default function SavedPage() {
         />
       ) : isPending ? (
         <div className="flex flex-col gap-2 px-4">
-          <SkeletonLine className="h-16 w-full rounded-md" />
-          <SkeletonLine className="h-16 w-full rounded-md" />
+          <SkeletonRow />
+          <SkeletonRow />
         </div>
       ) : saved.length === 0 ? (
         <EmptyState

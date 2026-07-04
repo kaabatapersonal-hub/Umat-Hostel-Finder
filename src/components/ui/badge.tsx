@@ -10,9 +10,16 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 const variantClasses: Record<BadgeVariant, string> = {
   featured: "bg-gold-500 text-ink-900",
-  available: "bg-success text-white",
+  // A soft tint, not a solid bright-green fill -- keeps this AA-compliant
+  // (white-on-#009639 was ~3.9:1, below the 4.5:1 small text needs) and
+  // avoids the "municipal" look of a large bright-green fill.
+  available: "bg-brand-50 text-brand-800",
   filling: "bg-gold-50 text-gold-600",
-  full: "bg-danger/10 text-danger",
+  // Solid, not a translucent tint -- "Full" is the one state worth a
+  // harder stop, and a 10%-opacity fill all but disappears over a photo
+  // thumbnail (this badge floats over card images). White-on-danger still
+  // clears AA (~4.9:1).
+  full: "bg-danger text-white",
   neutral: "bg-surface-muted text-ink-500",
 };
 

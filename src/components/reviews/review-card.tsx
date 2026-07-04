@@ -70,7 +70,7 @@ export function ReviewCard({ review, isOwn, onEdit, honestBadge }: ReviewCardPro
                 type="button"
                 aria-label="Edit your review"
                 onClick={onEdit}
-                className="flex size-8 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
+                className="flex size-11 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
               >
                 <Pencil className="size-4" />
               </button>
@@ -78,7 +78,7 @@ export function ReviewCard({ review, isOwn, onEdit, honestBadge }: ReviewCardPro
                 type="button"
                 aria-label="Delete your review"
                 onClick={() => setConfirmingDelete(true)}
-                className="flex size-8 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
+                className="flex size-11 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
               >
                 <Trash2 className="size-4" />
               </button>

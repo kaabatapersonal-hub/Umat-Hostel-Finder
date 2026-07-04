@@ -62,12 +62,12 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
         type="button"
         aria-label="Go back"
         onClick={() => router.back()}
-        className="absolute left-3 top-3 flex size-10 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
+        className="absolute left-3 top-3 flex size-11 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
       >
         <ArrowLeft className="size-5" />
       </button>
 
-      <SaveHeartButton hostel={hostel} className="absolute right-3 top-3 size-10" />
+      <SaveHeartButton hostel={hostel} className="absolute right-3 top-3" />
 
       {hasImages && images.length > 1 && (
         <>
@@ -81,11 +81,15 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
                 type="button"
                 aria-label={`Go to photo ${i + 1}`}
                 onClick={() => scrollToIndex(i)}
-                className={cn(
-                  "h-1.5 rounded-pill transition-all",
-                  i === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
-                )}
-              />
+                className="relative flex items-center justify-center before:absolute before:-inset-2.5 before:content-['']"
+              >
+                <span
+                  className={cn(
+                    "h-1.5 rounded-pill transition-all",
+                    i === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                  )}
+                />
+              </button>
             ))}
           </div>
         </>

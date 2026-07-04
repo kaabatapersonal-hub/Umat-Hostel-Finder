@@ -25,7 +25,7 @@ export function WhatsappGroupBanner({ whatsappGroupUrl }: WhatsappGroupBannerPro
         rel="noopener noreferrer"
         whileTap={{ scale: 0.98 }}
         transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-        className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-brand-800 bg-surface px-3 text-body-sm font-medium text-brand-800"
+        className="inline-flex h-11 shrink-0 items-center justify-center rounded-md border border-brand-800 bg-surface px-3.5 text-body-sm font-medium text-brand-800"
       >
         Join Group
       </motion.a>

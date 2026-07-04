@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, SlidersHorizontal, Building2, AlertCircle, Map as MapIcon } from "lucide-react";
+import { Search, Building2, AlertCircle, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
@@ -38,7 +38,10 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
   // appear after hydration has clearly already completed — either way they
   // shouldn't run a mount fade-in (see HostelCard's animateIn prop). Flips
   // to false right after mount, so every later render (search, filters,
-  // pagination) animates normally.
+  // pagination) animates normally. Pre-existing react-hooks/refs lint
+  // finding, not introduced this session -- see the identical note on
+  // HostelDetailsView; a setState-in-effect rewrite just trades it for the
+  // sibling rule, with an extra render pass and no actual benefit.
   const isFirstPaintRef = useRef(true);
   useEffect(() => {
     isFirstPaintRef.current = false;
@@ -78,7 +81,10 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
 
   return (
     <div className="flex flex-col">
-      <section className="bg-brand-800 px-4 pt-8 pb-6">
+      {/* The one brand moment: a quiet dark-to-deeper-green gradient so the
+          hero reads as a considered surface, not a flat color bar. The only
+          gradient in the app -- everywhere else stays flat by design. */}
+      <section className="bg-gradient-to-br from-brand-800 to-brand-900 px-4 pt-8 pb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="label text-caption text-gold-500">UMaT · Tarkwa</span>
@@ -105,13 +111,6 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
               className="w-full bg-transparent text-body text-ink-900 placeholder:text-ink-300 focus:outline-none"
             />
           </div>
-          <button
-            type="button"
-            aria-label="Filters"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-surface text-brand-800 shadow-card"
-          >
-            <SlidersHorizontal className="size-5" />
-          </button>
         </div>
       </section>
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ConditionalAppShell } from "@/components/layout/conditional-app-shell";
+import { getSiteUrl } from "@/lib/site-url";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -17,9 +18,26 @@ const inter = Inter({
   weight: ["400", "500", "600"],
 });
 
+const description = "Find your next hostel near UMaT — fast, trusted, and built for students.";
+
 export const metadata: Metadata = {
-  title: "UMaT Hostel Finder",
-  description: "Find your next hostel near UMaT — fast, trusted, and built for students.",
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: "UMaT Hostel Finder",
+    template: "%s — UMaT Hostel Finder",
+  },
+  description,
+  openGraph: {
+    title: "UMaT Hostel Finder",
+    description,
+    siteName: "UMaT Hostel Finder",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "UMaT Hostel Finder",
+    description,
+  },
 };
 
 export const viewport: Viewport = {

@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton, SkeletonLine } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonLine, SkeletonRow } from "@/components/ui/skeleton";
 import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
@@ -147,7 +147,7 @@ export default function ProfilePage() {
         <section className="flex flex-col gap-3">
           <h2 className="font-display text-h1 text-ink-900">My Listings</h2>
           {ownedPending ? (
-            <SkeletonLine className="h-14 w-full rounded-md" />
+            <SkeletonRow />
           ) : (
             <div className="flex flex-col gap-2">
               {ownedHostels.map((hostel) => (
@@ -181,7 +181,7 @@ export default function ProfilePage() {
         <h2 className="font-display text-h1 text-ink-900">My Submissions</h2>
         {submissionsPending ? (
           <div className="flex flex-col gap-2">
-            <SkeletonLine className="h-14 w-full rounded-md" />
+            <SkeletonRow />
           </div>
         ) : submissions.length === 0 ? (
           <EmptyState
@@ -202,7 +202,7 @@ export default function ProfilePage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">Saved Hostels</h2>
         {savedPending ? (
-          <SkeletonLine className="h-16 w-full rounded-md" />
+          <SkeletonRow />
         ) : saved.length === 0 ? (
           <EmptyState
             icon={<Heart className="size-7" strokeWidth={1.75} />}

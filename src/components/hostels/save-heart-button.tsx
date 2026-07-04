@@ -38,11 +38,11 @@ export function SaveHeartButton({ hostel, className }: SaveHeartButtonProps) {
       whileTap={{ scale: [1, 1.25, 1] }}
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "flex size-9 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm",
+        "flex size-11 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm",
         className
       )}
     >
-      <Heart className={cn("size-4", isSaved && "fill-gold-500 text-gold-500")} />
+      <Heart className={cn("size-5", isSaved && "fill-gold-500 text-gold-500")} />
     </motion.button>
   );
 }

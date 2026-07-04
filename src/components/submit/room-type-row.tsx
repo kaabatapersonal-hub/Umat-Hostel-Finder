@@ -52,7 +52,7 @@ export function RoomTypeRow({ draft, availableTypes, canRemove, errors, onChange
             type="button"
             aria-label="Remove room type"
             onClick={onRemove}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
+            className="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
           >
             <X className="size-4" />
           </button>

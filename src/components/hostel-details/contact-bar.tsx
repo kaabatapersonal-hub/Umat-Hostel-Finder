@@ -41,7 +41,10 @@ export function ContactBar({ hostelName, whatsappNumber, callNumber }: ContactBa
   }
 
   return (
-    <div className="fixed inset-x-4 bottom-24 z-40 flex flex-col gap-2">
+    <div
+      className="fixed inset-x-4 z-40 flex flex-col gap-2"
+      style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+    >
       <AnimatePresence>
         {revealed && (
           <motion.div

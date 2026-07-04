@@ -100,9 +100,15 @@ export default function HostelMap({
       zoomControl={false}
       className="h-full w-full"
     >
+      {/* CARTO's "Positron" style, not raw OSM tiles -- a quiet, desaturated
+          basemap so our green pins and the blue user dot are the loudest
+          thing on screen instead of competing with bank/pharmacy/every-shop
+          labels. Free for this app's traffic; CARTO + OSM both credited. */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        subdomains="abcd"
+        maxZoom={20}
       />
 
       <MarkerClusterGroup chunkedLoading>

@@ -23,3 +23,21 @@ export function SkeletonCard({ className, ...props }: React.HTMLAttributes<HTMLD
     </div>
   );
 }
+
+// Shape-matches the thumbnail + two-line rows used across Saved, Profile,
+// and Admin lists (SavedHostelRow, HostelRow, SubmissionRow, ...) instead
+// of a single generic gray bar.
+export function SkeletonRow({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("flex items-center gap-3 rounded-md border border-line bg-surface p-3", className)}
+      {...props}
+    >
+      <Skeleton className="size-16 shrink-0 rounded-md" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <SkeletonLine className="w-2/3" />
+        <SkeletonLine className="w-1/3" />
+      </div>
+    </div>
+  );
+}

@@ -66,11 +66,15 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
             </div>
 
             <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
-              <Badge variant={availability.variant} size="sm">
+              {/* Badges float on a photo (or its brand-tinted placeholder)
+                  here, unlike everywhere else Badge is used -- a shadow
+                  keeps them legible instead of blending into a
+                  same-toned thumbnail. */}
+              <Badge variant={availability.variant} size="sm" className="shadow-card">
                 {availability.label}
               </Badge>
               {hostel.isActivelyFeatured && (
-                <Badge variant="featured" size="sm">
+                <Badge variant="featured" size="sm" className="shadow-card">
                   Featured
                 </Badge>
               )}

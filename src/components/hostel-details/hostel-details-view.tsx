@@ -39,6 +39,14 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
   // mount fade-in would just leave already-painted content at opacity:0
   // until Framer Motion hydrates, which on a throttled connection can take
   // seconds (see the identical fix on the feed in Session 3).
+  //
+  // A ref, not state: the alternative (setState in the mount effect) trades
+  // this file's "no ref reads during render" lint finding for the *other*
+  // new react-hooks rule, "no setState in an effect body" -- neither hook
+  // shape satisfies both rules at once for a flag that must be correct on
+  // the very first render yet must not force an extra render just to prove
+  // it. Pre-existing finding (react-hooks/refs), not introduced this
+  // session -- left as-is rather than trading it for an equivalent one.
   const isFirstPaintRef = useRef(true);
   useEffect(() => {
     isFirstPaintRef.current = false;
@@ -101,6 +109,7 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
         className="flex flex-col gap-6 px-4 py-5"
       >
         <HeaderBlock
+          hostelId={hostel.id}
           name={hostel.name}
           priceMin={hostel.priceMin}
           priceMax={hostel.priceMax}

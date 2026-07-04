@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 
 export interface SheetProps {
   open: boolean;
@@ -19,6 +20,7 @@ export interface SheetProps {
 // user to a separate page.
 export function Sheet({ open, onClose, title, children, className }: SheetProps) {
   const shouldReduceMotion = useReducedMotion();
+  const keyboardInset = useKeyboardInset();
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +39,7 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             onClick={onClose}
             aria-hidden
             className="fixed inset-0 z-[60] bg-ink-900/50"
@@ -54,7 +56,12 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
               "fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] overflow-y-auto rounded-t-lg bg-surface p-6 shadow-md",
               className
             )}
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)",
+              // Shift up above an open on-screen keyboard instead of letting
+              // it cover the bottom of the sheet -- 0 when no keyboard is up.
+              bottom: keyboardInset || undefined,
+            }}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-line" />
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -63,7 +70,7 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
                 type="button"
                 aria-label="Close"
                 onClick={onClose}
-                className="ml-auto flex size-8 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
+                className="ml-auto flex size-11 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
               >
                 <X className="size-5" />
               </button>

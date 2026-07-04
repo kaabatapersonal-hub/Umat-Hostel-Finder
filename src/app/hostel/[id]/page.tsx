@@ -1,10 +1,24 @@
+import type { Metadata } from "next";
 import { getCachedHostelById } from "@/lib/queries/hostel-details-cached";
 import { HostelDetailsView } from "@/components/hostel-details/hostel-details-view";
 import type { HostelDetails } from "@/lib/queries/hostels";
 
 export const revalidate = 60;
 
-export default async function HostelDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+type PageProps = { params: Promise<{ id: string }> };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const hostel = await getCachedHostelById(id).catch(() => null);
+  if (!hostel) return { title: "Hostel" };
+
+  return {
+    title: hostel.name,
+    description: hostel.description || `${hostel.name} in ${hostel.location} — near UMaT, Tarkwa.`,
+  };
+}
+
+export default async function HostelDetailsPage({ params }: PageProps) {
   const { id } = await params;
 
   let initialHostel: HostelDetails | null | undefined;

@@ -1,8 +1,10 @@
-import { MapPin, Clock, Star, Navigation2 } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Clock, Star, Navigation2, Map as MapIcon } from "lucide-react";
 import { PriceTag } from "@/components/ui/price-tag";
 import { formatWalkTime, buildDirectionsLink } from "@/lib/geo";
 
 export interface HeaderBlockProps {
+  hostelId: string;
   name: string;
   priceMin: number | null;
   priceMax: number | null;
@@ -16,6 +18,7 @@ export interface HeaderBlockProps {
 }
 
 export function HeaderBlock({
+  hostelId,
   name,
   priceMin,
   priceMax,
@@ -71,8 +74,10 @@ export function HeaderBlock({
         ) : (
           <span className="text-body-sm text-ink-500">New — no reviews yet</span>
         )}
+      </div>
 
-        {latitude != null && longitude != null && (
+      {latitude != null && longitude != null && (
+        <div className="flex flex-wrap items-center gap-4">
           <a
             href={buildDirectionsLink({ lat: latitude, lng: longitude })}
             target="_blank"
@@ -82,8 +87,15 @@ export function HeaderBlock({
             <Navigation2 className="size-3.5" />
             Directions
           </a>
-        )}
-      </div>
+          <Link
+            href={`/map?hostelId=${hostelId}`}
+            className="flex items-center gap-1 text-body-sm font-medium text-brand-800"
+          >
+            <MapIcon className="size-3.5" />
+            View on map
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

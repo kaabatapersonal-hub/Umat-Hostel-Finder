@@ -30,9 +30,10 @@ export function StarPicker({ value, onChange, className }: StarPickerProps) {
           aria-checked={value === star}
           aria-label={`${star} star${star === 1 ? "" : "s"}`}
           whileTap={{ scale: 1.2 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           onMouseEnter={() => setHovered(star)}
           onClick={() => onChange(star)}
-          className="p-0.5"
+          className="flex size-11 items-center justify-center"
         >
           <Star className={cn("size-8", star <= display ? "fill-gold-500 text-gold-500" : "text-ink-300")} />
         </motion.button>
