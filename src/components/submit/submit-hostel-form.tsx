@@ -36,13 +36,18 @@ interface FormErrors {
 // kinds are the Session 8/8.5 student-facing flows; "admin-create" and
 // "admin-edit" (Session 10) write directly to a live hostels row -- admin
 // already has full RLS rights, so there's no submission queue or pending
-// buffer in either direction.
+// buffer in either direction. "admin-edit-submission" (Session 11) is the
+// review queue's edit-before-approve step -- it reuses the exact same
+// updateSubmission mutation as a student's own edit-submission mode,
+// since admin's UPDATE policy on submissions has no owner/status
+// restriction; only the success-screen copy and navigation differ.
 export type SubmitFormMode =
   | { kind: "create" }
   | { kind: "edit-submission"; submissionId: string }
   | { kind: "edit-hostel"; hostelId: string; hasPendingEdit: boolean }
   | { kind: "admin-create" }
-  | { kind: "admin-edit"; hostelId: string };
+  | { kind: "admin-edit"; hostelId: string }
+  | { kind: "admin-edit-submission"; submissionId: string };
 
 export interface SubmitHostelFormProps {
   mode?: SubmitFormMode;
@@ -131,7 +136,7 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
   const isPending =
     mode.kind === "create"
       ? submitHostel.isPending
-      : mode.kind === "edit-submission"
+      : mode.kind === "edit-submission" || mode.kind === "admin-edit-submission"
         ? updateSubmission.isPending
         : mode.kind === "edit-hostel"
           ? submitPendingEdit.isPending
@@ -203,7 +208,7 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
 
     if (mode.kind === "create") {
       submitHostel.mutate(fields, { onSuccess: () => setSubmitted(true), onError });
-    } else if (mode.kind === "edit-submission") {
+    } else if (mode.kind === "edit-submission" || mode.kind === "admin-edit-submission") {
       updateSubmission.mutate({ id: mode.submissionId, ...fields }, { onSuccess: () => setSubmitted(true), onError });
     } else if (mode.kind === "edit-hostel") {
       submitPendingEdit.mutate({ hostelId: mode.hostelId, fields }, { onSuccess: () => setSubmitted(true), onError });
@@ -230,11 +235,19 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
               }
             : mode.kind === "admin-create"
               ? { title: "Hostel added!", description: "It's live immediately — students can find it right now." }
-              : { title: "Saved!", description: "The live listing has been updated." };
+              : mode.kind === "admin-edit-submission"
+                ? { title: "Changes saved!", description: "The submission has been updated." }
+                : { title: "Saved!", description: "The live listing has been updated." };
 
     const isAdminMode = mode.kind === "admin-create" || mode.kind === "admin-edit";
-    const primaryHref = isAdminMode ? "/admin/hostels" : "/profile";
-    const primaryLabel = isAdminMode ? "Back to Hostels" : mode.kind === "create" ? "View My Submissions" : "Back to Profile";
+    const primaryHref = isAdminMode ? "/admin/hostels" : mode.kind === "admin-edit-submission" ? "/admin/submissions" : "/profile";
+    const primaryLabel = isAdminMode
+      ? "Back to Hostels"
+      : mode.kind === "admin-edit-submission"
+        ? "Back to Submissions"
+        : mode.kind === "create"
+          ? "View My Submissions"
+          : "Back to Profile";
 
     return (
       <div className="flex flex-col items-center gap-4 rounded-lg bg-surface px-6 py-12 text-center shadow-card">
@@ -259,8 +272,13 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
               Save & Add Another
             </Button>
           )}
+          {mode.kind === "admin-edit-submission" && (
+            <Button variant="accent" size="lg" className="w-full" onClick={() => setSubmitted(false)}>
+              Continue Reviewing
+            </Button>
+          )}
           <Link href={primaryHref}>
-            <Button variant={mode.kind === "admin-create" ? "secondary" : "primary"} size="lg" className="w-full">
+            <Button variant={isAdminMode || mode.kind === "admin-edit-submission" ? "secondary" : "primary"} size="lg" className="w-full">
               {primaryLabel}
             </Button>
           </Link>
@@ -367,7 +385,7 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
       <Button type="submit" variant="accent" size="lg" loading={isPending}>
         {mode.kind === "create"
           ? "Submit for Review"
-          : mode.kind === "edit-submission"
+          : mode.kind === "edit-submission" || mode.kind === "admin-edit-submission"
             ? "Save Changes"
             : mode.kind === "edit-hostel"
               ? "Submit Changes for Approval"

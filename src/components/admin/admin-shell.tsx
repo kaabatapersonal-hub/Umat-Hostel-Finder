@@ -2,21 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, PlusCircle, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Building2, PlusCircle, FileClock, PenLine, Flag, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Submissions + Moderation tabs land in Session 11 -- this array is the
-// single place to add them when that queue exists.
 const TABS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/hostels", label: "Hostels", icon: Building2 },
   { href: "/admin/hostels/new", label: "Add Hostel", icon: PlusCircle },
+  { href: "/admin/submissions", label: "Submissions", icon: FileClock },
+  { href: "/admin/edit-requests", label: "Edit Requests", icon: PenLine },
+  { href: "/admin/moderation", label: "Moderation", icon: Flag },
 ];
 
 function isTabActive(href: string, pathname: string): boolean {
   if (href === "/admin") return pathname === "/admin";
   if (href === "/admin/hostels/new") return pathname === "/admin/hostels/new";
   if (href === "/admin/hostels") return pathname === "/admin/hostels" || /^\/admin\/hostels\/[^/]+\/edit$/.test(pathname);
+  if (href === "/admin/submissions") return pathname === "/admin/submissions" || /^\/admin\/submissions\/[^/]+$/.test(pathname);
   return pathname === href;
 }
 

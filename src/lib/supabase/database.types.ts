@@ -500,6 +500,14 @@ export interface Database {
         Args: { p_hostel_id: string };
         Returns: undefined;
       };
+      approve_submission: {
+        Args: { p_submission_id: string };
+        Returns: string;
+      };
+      reject_submission: {
+        Args: { p_submission_id: string; p_admin_note?: string | null };
+        Returns: undefined;
+      };
       get_hostel_feed: {
         Args: {
           p_search?: string | null;
