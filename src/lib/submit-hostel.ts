@@ -4,13 +4,21 @@ import { ROOM_TYPE_ORDER, type RoomTypeKey } from "@/lib/room-types";
 
 const uploadedImageSchema = z.object({
   url: z.string(),
+  thumbUrl: z.string().nullable(),
   blurDataURL: z.string().nullable(),
 });
+
+// Caps mirror ImageUploader's maxFiles props (5 general / 3 per room type)
+// — enforced here too since this schema is the one gate every form
+// (submit / admin create / admin edit / owner edit-request) validates
+// against before writing anywhere.
+const MAX_HOSTEL_IMAGES = 5;
+const MAX_ROOM_TYPE_IMAGES = 3;
 
 const roomTypeFormSchema = z.object({
   type: z.enum(ROOM_TYPE_ORDER as [RoomTypeKey, ...RoomTypeKey[]]),
   price: z.coerce.number({ error: "Enter a price" }).positive("Price must be greater than 0"),
-  images: z.array(uploadedImageSchema).default([]),
+  images: z.array(uploadedImageSchema).max(MAX_ROOM_TYPE_IMAGES, `Up to ${MAX_ROOM_TYPE_IMAGES} photos per room type`).default([]),
 });
 
 // The whole Submit form, validated as one shape at submit time. Room-type
@@ -40,7 +48,7 @@ export const submitHostelSchema = z
           seen.add(entry.type);
         });
       }),
-    images: z.array(uploadedImageSchema).default([]),
+    images: z.array(uploadedImageSchema).max(MAX_HOSTEL_IMAGES, `Up to ${MAX_HOSTEL_IMAGES} photos`).default([]),
     facilities: z.array(z.string()).default([]),
     whatsappNumber: z
       .string()

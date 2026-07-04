@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Home, Map, Heart, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <nav
@@ -35,6 +36,15 @@ export function BottomNav() {
             <li key={href} className="flex-1">
               <Link
                 href={href}
+                onClick={(e) => {
+                  // Tapping the tab you're already on has nowhere to
+                  // navigate to -- scroll back to the top instead, a free
+                  // "get me back to the start" affordance.
+                  if (isActive) {
+                    e.preventDefault();
+                    window.scrollTo({ top: 0, behavior: shouldReduceMotion ? "auto" : "smooth" });
+                  }
+                }}
                 className="relative flex flex-col items-center justify-center gap-1 py-2.5 text-caption"
               >
                 <motion.span

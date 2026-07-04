@@ -345,7 +345,7 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
 
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">Photos</h2>
-        <ImageUploader bucket="hostel-images" label="Hostel photos" value={form.images} onChange={(next) => set("images", next)} maxFiles={10} />
+        <ImageUploader bucket="hostel-images" label="Hostel photos" value={form.images} onChange={(next) => set("images", next)} maxFiles={5} />
       </section>
 
       <section className="flex flex-col gap-3">

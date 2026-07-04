@@ -28,6 +28,13 @@ export interface ImageUploaderProps {
   label?: string;
 }
 
+// Accept-and-compress, never reject-by-size: browser-image-compression
+// downscales anything, however large. This is only a sanity ceiling against
+// a genuinely absurd pick (a multi-hundred-megabyte file that would hang a
+// cheap phone's browser trying to decode it) -- not a real-world photo
+// limit.
+const ABSOLUTE_MAX_BYTES = 30 * 1024 * 1024;
+
 function slotsToImages(slots: UploadSlot[]): UploadedImage[] {
   return slots.filter((s): s is UploadSlot & { image: UploadedImage } => s.status === "done" && !!s.image).map((s) => s.image);
 }
@@ -42,6 +49,7 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [formMessage, setFormMessage] = useState<string | null>(null);
 
   // Calling onChange (which triggers the parent's setState) from inside a
   // setSlots updater is a React anti-pattern — updater functions must be
@@ -64,29 +72,41 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
     try {
       setSlots((prev) => prev.map((s) => (s.key === key ? { ...s, status: "compressing", progress: 0, error: undefined } : s)));
 
-      const { file: compressed, blurDataURL } = await compressImageForUpload(file, (progress) => {
-        setSlots((prev) => prev.map((s) => (s.key === key ? { ...s, progress: Math.round(progress * 0.6) } : s)));
-      });
+      let fullFile: File, thumbFile: File, blurDataURL: string;
+      try {
+        ({ fullFile, thumbFile, blurDataURL } = await compressImageForUpload(file, (progress) => {
+          setSlots((prev) => prev.map((s) => (s.key === key ? { ...s, progress: Math.round(progress * 0.6) } : s)));
+        }));
+      } catch {
+        // browser-image-compression throws on a file it can't decode at
+        // all (truncated/corrupted) -- the raw error isn't reader-friendly.
+        throw new Error("Couldn't read this photo — it may be corrupted. Try a different one.");
+      }
 
       setSlots((prev) => prev.map((s) => (s.key === key ? { ...s, status: "uploading", progress: 65 } : s)));
 
       // No native byte-level progress from supabase-js's upload() (it's a
       // plain fetch POST) — nudge the bar while we wait so it doesn't look
-      // stalled, then snap to 100 on completion.
+      // stalled, then snap to 100 on completion. Two uploads (full + thumb)
+      // share this same visual band rather than each getting their own
+      // 0-100 pass, so the bar still reads as one continuous operation.
       const ticker = setInterval(() => {
         setSlots((prev) =>
-          prev.map((s) => (s.key === key && s.status === "uploading" && s.progress < 95 ? { ...s, progress: s.progress + 3 } : s))
+          prev.map((s) => (s.key === key && s.status === "uploading" && s.progress < 95 ? { ...s, progress: s.progress + 2 } : s))
         );
       }, 200);
 
-      let url: string;
+      let url: string, thumbUrl: string;
       try {
-        url = await uploadImageToStorage(supabase, bucket, compressed);
+        [url, thumbUrl] = await Promise.all([
+          uploadImageToStorage(supabase, bucket, fullFile),
+          uploadImageToStorage(supabase, bucket, thumbFile),
+        ]);
       } finally {
         clearInterval(ticker);
       }
 
-      const image: UploadedImage = { url, blurDataURL };
+      const image: UploadedImage = { url, thumbUrl, blurDataURL };
       setSlots((prev) =>
         prev.map((s) => (s.key === key ? { ...s, status: "done" as const, progress: 100, previewUrl: url, image } : s))
       );
@@ -102,9 +122,22 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
   }
 
   function addFiles(files: FileList | File[]) {
-    const list = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .slice(0, remainingSlots);
+    const incoming = Array.from(files);
+    const nonImage = incoming.filter((f) => !f.type.startsWith("image/"));
+    const tooBig = incoming.filter((f) => f.type.startsWith("image/") && f.size > ABSOLUTE_MAX_BYTES);
+    const acceptable = incoming.filter((f) => f.type.startsWith("image/") && f.size <= ABSOLUTE_MAX_BYTES);
+    const list = acceptable.slice(0, remainingSlots);
+    const overCap = acceptable.length > list.length;
+
+    if (nonImage.length > 0) {
+      setFormMessage("Only photos can be added here.");
+    } else if (tooBig.length > 0) {
+      setFormMessage("That photo is too large to upload — try a smaller one.");
+    } else if (overCap) {
+      setFormMessage(`Maximum ${maxFiles} photos — remove one to add another.`);
+    } else {
+      setFormMessage(null);
+    }
 
     for (const file of list) {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -128,15 +161,21 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
   function removeSlot(key: string) {
     const slot = slots.find((s) => s.key === key);
     setSlots((prev) => prev.filter((s) => s.key !== key));
+    setFormMessage(null);
 
     // The main fix for Session 5's tracked orphan-cleanup loose end: a
     // slot that finished uploading has a real Storage object behind it, so
     // removing it from the form must also delete it, not just drop it from
     // the array. Best-effort -- a failed delete here just leaves an
-    // orphan, same as the already-accepted abandon-mid-form case.
+    // orphan, same as the already-accepted abandon-mid-form case. Two
+    // objects now (full + thumb variant), deleted independently so one
+    // failing doesn't block the other.
     if (slot?.status === "done" && slot.image) {
       const supabase = createClient();
       void deleteImageFromStorage(supabase, bucket, slot.image.url).catch(() => {});
+      if (slot.image.thumbUrl) {
+        void deleteImageFromStorage(supabase, bucket, slot.image.thumbUrl).catch(() => {});
+      }
     }
   }
 
@@ -183,7 +222,9 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
       >
         <ImagePlus className="size-6 text-brand-800" strokeWidth={1.5} />
         <p className="text-body-sm text-ink-500">
-          {remainingSlots > 0 ? "Tap to add photos, or drag and drop" : "Photo limit reached"}
+          {remainingSlots > 0
+            ? "Tap to add photos, or drag and drop"
+            : `Maximum ${maxFiles} photos — remove one to add another`}
         </p>
         <input
           ref={inputRef}
@@ -195,6 +236,8 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
           disabled={remainingSlots === 0}
         />
       </div>
+
+      {formMessage && <p className="text-body-sm text-danger">{formMessage}</p>}
 
       {slots.length > 0 && (
         <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
@@ -217,7 +260,8 @@ export function ImageUploader({ bucket, value, onChange, maxFiles = 10, label = 
 
               {slot.status === "error" && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-danger/80 p-2 text-center text-white">
-                  <AlertCircle className="size-5" />
+                  <AlertCircle className="size-5 shrink-0" />
+                  {slot.error && <p className="line-clamp-3 text-[10px] leading-tight">{slot.error}</p>}
                   <button
                     type="button"
                     onClick={() => retrySlot(slot.key)}

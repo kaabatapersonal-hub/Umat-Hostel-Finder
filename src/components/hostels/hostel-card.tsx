@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { PriceTag } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
 import { SaveHeartButton } from "./save-heart-button";
+import { thumbnailSrc } from "@/lib/images";
 import type { HostelCard as HostelCardData } from "@/lib/queries/hostels";
 
 const AVAILABILITY_CONFIG: Record<string, { label: string; variant: "available" | "filling" | "full" }> = {
@@ -42,7 +43,7 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
       <Link href={`/hostel/${hostel.id}`} className="block">
         <Card interactive className="h-full">
           <SmartImage
-            src={thumbnail?.url ?? null}
+            src={thumbnailSrc(thumbnail)}
             blurDataURL={thumbnail?.blurDataURL}
             alt={hostel.name}
             sizeHint="thumbnail"

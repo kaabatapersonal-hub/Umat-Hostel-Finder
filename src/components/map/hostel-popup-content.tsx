@@ -4,6 +4,7 @@ import { SmartImage } from "@/components/ui/smart-image";
 import { PriceTag } from "@/components/ui/price-tag";
 import { Badge } from "@/components/ui/badge";
 import { formatWalkTime, buildDirectionsLink, haversineDistanceKm, type LatLng } from "@/lib/geo";
+import { thumbnailSrc } from "@/lib/images";
 import type { MapHostelPin } from "@/lib/queries/map-hostels";
 
 const AVAILABILITY_CONFIG: Record<string, { label: string; variant: "available" | "filling" | "full" }> = {
@@ -37,7 +38,7 @@ export function HostelPopupContent({ hostel, userPosition, customPoint }: Hostel
     <div className="flex w-56 flex-col gap-2">
       <Link href={`/hostel/${hostel.id}`} className="flex flex-col gap-2">
         <SmartImage
-          src={hostel.thumbnail?.url ?? null}
+          src={thumbnailSrc(hostel.thumbnail)}
           blurDataURL={hostel.thumbnail?.blurDataURL}
           alt={hostel.name}
           sizeHint="thumbnail"

@@ -9,6 +9,7 @@ import { PriceTag } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
 import { useAdminSubmissions } from "@/hooks/use-admin-submissions";
 import { formatRelativeTime, cn } from "@/lib/utils";
+import { thumbnailSrc } from "@/lib/images";
 
 const STATUS_TABS = [
   { value: "pending", label: "Pending" },
@@ -71,7 +72,7 @@ export default function AdminSubmissionsPage() {
               className="flex items-center gap-3 rounded-lg bg-surface p-3 shadow-card"
             >
               <SmartImage
-                src={submission.thumbnail?.url ?? null}
+                src={thumbnailSrc(submission.thumbnail)}
                 blurDataURL={submission.thumbnail?.blurDataURL}
                 alt={submission.name}
                 sizeHint="thumbnail"

@@ -5,9 +5,25 @@ import imageCompression from "browser-image-compression";
 // smaller Storage footprint, faster delivery. EXIF/GPS metadata is stripped
 // by default (browser-image-compression's `preserveExif` defaults to false)
 // — a manager's phone photo shouldn't silently leak their home location.
-const MAX_DIMENSION_PX = 1600;
-const TARGET_MAX_SIZE_MB = 0.5;
-const INITIAL_QUALITY = 0.8;
+//
+// Session 12.5: a single 1600px/q0.8 variant was a compromise that made
+// full-width details/lightbox views look soft. Two variants now, generated
+// client-side from the same source file so nothing extra hits the network
+// beyond one additional (small) upload per photo:
+//   - thumb: feed cards, saved rows, admin lists, map popups -- smaller and
+//     faster than the old single variant, not just "as fast".
+//   - full: details hero/gallery, room-type galleries, the lightbox --
+//     visibly sharper than the old single variant.
+const THUMB_DIMENSION_PX = 640;
+const THUMB_QUALITY = 0.75;
+
+const FULL_DIMENSION_PX = 1920;
+const FULL_QUALITY = 0.85;
+
+// A huge input (e.g. a 6000px, 15MB phone photo) is never rejected for
+// size -- maxWidthOrHeight/maxSizeMB below make browser-image-compression
+// downscale it like anything else. The only ceiling lives in the uploader
+// UI (an absurd-input safety net), not here.
 
 // The blur placeholder: a ~20px-wide, heavily compressed version encoded as
 // a base64 data URL. It travels with the record (see lib/images.ts), so
@@ -16,23 +32,32 @@ const BLUR_DIMENSION_PX = 20;
 const BLUR_QUALITY = 0.5;
 
 export interface CompressedImage {
-  file: File;
+  fullFile: File;
+  thumbFile: File;
   blurDataURL: string;
 }
 
-// onProgress reports 0-100 for the main compression pass only — the blur
-// pass is comparatively instant and not worth its own progress reporting.
+// onProgress reports 0-100 across all three compression passes (full, thumb,
+// blur) combined, so the uploader's progress bar reads as one continuous
+// operation rather than restarting twice.
 export async function compressImageForUpload(
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<CompressedImage> {
-  const compressed = await imageCompression(file, {
-    maxWidthOrHeight: MAX_DIMENSION_PX,
-    maxSizeMB: TARGET_MAX_SIZE_MB,
-    initialQuality: INITIAL_QUALITY,
+  const fullFile = await imageCompression(file, {
+    maxWidthOrHeight: FULL_DIMENSION_PX,
+    initialQuality: FULL_QUALITY,
     fileType: "image/webp",
     useWebWorker: true,
-    onProgress,
+    onProgress: (p) => onProgress?.(Math.round(p * 0.6)),
+  });
+
+  const thumbFile = await imageCompression(file, {
+    maxWidthOrHeight: THUMB_DIMENSION_PX,
+    initialQuality: THUMB_QUALITY,
+    fileType: "image/webp",
+    useWebWorker: true,
+    onProgress: (p) => onProgress?.(60 + Math.round(p * 0.3)),
   });
 
   const tinyBlurSource = await imageCompression(file, {
@@ -42,6 +67,7 @@ export async function compressImageForUpload(
     useWebWorker: true,
   });
   const blurDataURL = await imageCompression.getDataUrlFromFile(tinyBlurSource);
+  onProgress?.(100);
 
-  return { file: compressed, blurDataURL };
+  return { fullFile, thumbFile, blurDataURL };
 }

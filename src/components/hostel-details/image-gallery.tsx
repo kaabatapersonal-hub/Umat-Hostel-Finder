@@ -2,12 +2,18 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartImage } from "@/components/ui/smart-image";
 import { SaveHeartButton } from "@/components/hostels/save-heart-button";
 import type { UploadedImage } from "@/lib/images";
 import type { SaveableHostelInput } from "@/lib/queries/saved-hostels";
+
+// The lightbox library only matters once someone actually taps a photo --
+// code-split it out of the details page's initial bundle rather than pay
+// for it on every visit (same reasoning as the map's dynamic import).
+const PhotoLightbox = dynamic(() => import("./photo-lightbox").then((m) => m.PhotoLightbox), { ssr: false });
 
 export interface ImageGalleryProps {
   images: UploadedImage[];
@@ -18,6 +24,7 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const hasImages = images.length > 0;
 
@@ -42,7 +49,13 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
           className="flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {images.map((image, i) => (
-            <div key={image.url + i} className="relative h-full w-full shrink-0 snap-center">
+            <button
+              key={image.url + i}
+              type="button"
+              aria-label={`View photo ${i + 1} fullscreen`}
+              onClick={() => setLightboxOpen(true)}
+              className="relative h-full w-full shrink-0 snap-center appearance-none p-0 text-left"
+            >
               <SmartImage
                 src={image.url}
                 blurDataURL={image.blurDataURL}
@@ -51,7 +64,7 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
                 priority={i === 0}
                 className="h-full w-full"
               />
-            </div>
+            </button>
           ))}
         </div>
       ) : (
@@ -93,6 +106,16 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
             ))}
           </div>
         </>
+      )}
+
+      {hasImages && (
+        <PhotoLightbox
+          images={images}
+          alt={hostel.name}
+          open={lightboxOpen}
+          startIndex={activeIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </div>
   );

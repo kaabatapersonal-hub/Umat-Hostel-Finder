@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AvailabilitySelect } from "./availability-select";
 import { FeaturedEditor } from "./featured-editor";
 import { useDeleteHostelAdmin } from "@/hooks/use-delete-hostel-admin";
+import { thumbnailSrc } from "@/lib/images";
 import type { AdminHostelRow } from "@/lib/queries/admin-hostels";
 
 export function HostelRow({ hostel }: { hostel: AdminHostelRow }) {
@@ -19,7 +20,7 @@ export function HostelRow({ hostel }: { hostel: AdminHostelRow }) {
     <div className="flex flex-col gap-3 rounded-lg bg-surface p-3 shadow-card sm:flex-row sm:items-center">
       <div className="flex items-center gap-3">
         <SmartImage
-          src={hostel.thumbnail?.url ?? null}
+          src={thumbnailSrc(hostel.thumbnail)}
           blurDataURL={hostel.thumbnail?.blurDataURL}
           alt={hostel.name}
           sizeHint="thumbnail"

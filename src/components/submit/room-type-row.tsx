@@ -76,7 +76,7 @@ export function RoomTypeRow({ draft, availableTypes, canRemove, errors, onChange
         label="Photos for this room type (optional)"
         value={draft.images}
         onChange={(images) => onChange({ ...draft, images })}
-        maxFiles={4}
+        maxFiles={3}
       />
     </div>
   );
