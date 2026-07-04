@@ -109,6 +109,9 @@ export default function ProfilePage() {
           onAction={() => requireAuth(() => {})}
           className="mx-4 mt-4 bg-surface shadow-card"
         />
+        <Link href="/about" className="mx-4 mt-4 text-center text-body-sm text-ink-500 underline underline-offset-2">
+          About UMaT Hostel Finder
+        </Link>
       </div>
     );
   }
@@ -223,6 +226,10 @@ export default function ProfilePage() {
         <LogOut className="size-4" />
         Sign Out
       </Button>
+
+      <Link href="/about" className="text-center text-body-sm text-ink-500 underline underline-offset-2">
+        About UMaT Hostel Finder
+      </Link>
     </div>
   );
 }
