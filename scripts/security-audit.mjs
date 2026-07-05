@@ -570,6 +570,103 @@ async function main() {
   }
 
   // =====================================================================
+  // Admin user management (Session 16): promote/demote/suspend RPCs +
+  // suspend enforcement. Uses the persistent stranger account for the
+  // promote/demote/suspend round trip -- every check here is followed by
+  // an unconditional safety-net cleanup so a failed assertion never
+  // leaves that account admin/suspended for the *next* run (which would
+  // silently invalidate a bunch of "stranger cannot X" checks earlier in
+  // the file on a future run).
+  // =====================================================================
+  section("admin user management (Session 16)");
+  {
+    const strangerSetRole = await rpc(strangerToken, "set_user_role", { p_user_id: strangerUid, p_role: "admin" });
+    check("non-admin cannot call set_user_role", !strangerSetRole.ok, JSON.stringify(strangerSetRole.body));
+
+    const strangerSetSuspended = await rpc(strangerToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
+    check("non-admin cannot call set_user_suspended", !strangerSetSuspended.ok, JSON.stringify(strangerSetSuspended.body));
+
+    const strangerActivityCounts = await rpc(strangerToken, "get_user_activity_counts", { p_user_ids: [strangerUid] });
+    check("non-admin cannot call get_user_activity_counts", !strangerActivityCounts.ok, JSON.stringify(strangerActivityCounts.body));
+
+    const strangerDeleteReviews = await rpc(strangerToken, "delete_user_reviews", { p_user_id: strangerUid });
+    check("non-admin cannot call delete_user_reviews", !strangerDeleteReviews.ok, JSON.stringify(strangerDeleteReviews.body));
+
+    const selfDemote = await rpc(adminToken, "set_user_role", { p_user_id: admin.user.id, p_role: "student" });
+    check("admin cannot demote themselves", !selfDemote.ok, JSON.stringify(selfDemote.body));
+
+    const selfSuspend = await rpc(adminToken, "set_user_suspended", { p_user_id: admin.user.id, p_suspended: true });
+    check("admin cannot suspend themselves", !selfSuspend.ok, JSON.stringify(selfSuspend.body));
+
+    const promote = await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "admin" });
+    const afterPromote = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=role`);
+    check(
+      "admin can promote another user to admin",
+      promote.ok && afterPromote.body?.[0]?.role === "admin",
+      JSON.stringify(afterPromote.body)
+    );
+
+    const demote = await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "student" });
+    const afterDemote = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=role`);
+    check(
+      "admin can demote back to student",
+      demote.ok && afterDemote.body?.[0]?.role === "student",
+      JSON.stringify(afterDemote.body)
+    );
+
+    const activityCounts = await rpc(adminToken, "get_user_activity_counts", { p_user_ids: [strangerUid] });
+    check(
+      "admin get_user_activity_counts succeeds and returns a row for the id requested",
+      activityCounts.ok && activityCounts.body?.[0]?.user_id === strangerUid,
+      JSON.stringify(activityCounts.body)?.slice(0, 200)
+    );
+
+    // The critical one: suspend a user whose session token was already
+    // issued *before* the suspension, then use that same stale token to
+    // attempt a write. If this only checked at sign-in, an already-signed-
+    // in abuser could keep posting after being suspended -- it doesn't,
+    // because is_suspended() is re-evaluated by RLS on every request.
+    const suspend = await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
+    check("admin can suspend another user", suspend.ok, JSON.stringify(suspend.body));
+
+    const suspendedReviewAttempt = await post(strangerToken, "/reviews", {
+      hostel_id: ownerHostelId,
+      author_id: strangerUid,
+      rating: 5,
+      comment: "Should be rejected -- account is suspended.",
+    });
+    check(
+      "a suspended account's existing session cannot post a review",
+      !suspendedReviewAttempt.ok,
+      `status ${suspendedReviewAttempt.status}`
+    );
+
+    const suspendedSubmissionAttempt = await post(strangerToken, "/submissions", {
+      submitted_by: strangerUid,
+      name: "[Security Audit] Should be rejected -- suspended",
+      location: "x",
+      contact: "233200000000",
+    });
+    check(
+      "a suspended account's existing session cannot submit a hostel",
+      !suspendedSubmissionAttempt.ok,
+      `status ${suspendedSubmissionAttempt.status}`
+    );
+
+    const unsuspend = await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+    const afterUnsuspend = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=is_suspended`);
+    check(
+      "unsuspend restores the account",
+      unsuspend.ok && afterUnsuspend.body?.[0]?.is_suspended === false,
+      JSON.stringify(afterUnsuspend.body)
+    );
+
+    // Unconditional safety net -- see section comment above.
+    await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "student" });
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+  }
+
+  // =====================================================================
   // Storage: MIME allow-list, size cap, cross-user write scoping
   // =====================================================================
   section("storage");

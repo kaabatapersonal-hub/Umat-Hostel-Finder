@@ -37,6 +37,21 @@ before every release (see that file's header for setup/env vars).
 - **`wa.me`/`tel:` links are injection-safe by construction** — `normalizePhoneNumber()` strips everything but digits before a URL is ever built.
 - **RLS matrix** across `profiles`, `hostels`, `submissions`, `reviews`, `saved_hostels`, `roommate_profiles`, `roommate_requests` for anonymous / authenticated-stranger / owner / admin — see `scripts/security-audit.mjs` for the full, re-runnable matrix.
 
+## Session 16: Admin User Management
+
+Added a Users tab (list every profile, view a user's activity, promote/
+demote, suspend/unsuspend, bulk-delete a user's reviews) and a
+"Registered users" dashboard stat. New admin-only surface, so it got
+the same adversarial treatment as everything else:
+
+- **No new read policy was needed.** Session 15's `profiles_select_own_or_admin` already lets an admin read every profile; `reviews`/`submissions`/`saved_hostels`/`hostels` already OR `is_admin()` into (or are fully public in) their own SELECT policies. Only the *writes* below are new.
+- **`set_user_role`/`set_user_suspended`/`get_user_activity_counts`/`delete_user_reviews`** are all `SECURITY DEFINER`, `search_path`-pinned, and gated with the same `if not is_admin() then raise exception` idiom as every other admin RPC — verified a non-admin caller gets rejected on all four.
+- **Self-demotion and self-suspension are blocked** inside the RPCs themselves (not just disabled in the UI) — an admin can't accidentally lock themselves out, verified via direct API call.
+- **Suspend enforcement is scoped to `reviews` and `submissions` INSERT**, not every write in the schema. This is deliberate: the brief's own use case is "a student spamming fake reviews or abusive content," and broadening a `not is_suspended()` check into every table's write policies (saved_hostels, roommate_*, etc.) would be a much larger, riskier diff for abuse vectors that don't actually exist yet. If a new abuse pattern shows up post-launch, extend `is_suspended()` into that table's policy the same way.
+- **Verified the enforcement is real, not just cosmetic:** a test account was suspended *after* its session token was already issued, then that same stale token was used to attempt a review post and a submission — both rejected. This proves the check happens server-side on every request (RLS re-evaluates `is_suspended()` live), not just at sign-in — an already-logged-in abuser can't keep posting after being suspended.
+- **Client-side kick-out is a UX nicety, not the security boundary.** `auth-provider.tsx` signs a suspended user out the next time it fetches their own profile (on load/auth-state-change). This was deliberately *not* added to `proxy.ts`'s middleware, which runs on every single request app-wide — a per-request DB round trip there for a rare edge case was judged not worth the blanket perf cost, given the RLS-layer enforcement above already holds regardless of what the client does.
+- **No actual sign-in denial.** "Suspended" doesn't stop Supabase Auth from issuing a fresh session to a suspended account's credentials — that would need a Dashboard-configured Auth Hook (a project-level setting, not a migration). In practice it doesn't matter: the moment that session's profile is fetched, they're signed back out, and every write they'd want to make is rejected regardless.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:

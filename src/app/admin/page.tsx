@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Star, FileClock, Heart, PenLine, Flag, BadgeCheck, MapPinOff, AlertCircle } from "lucide-react";
+import { Building2, Star, FileClock, Heart, PenLine, Flag, BadgeCheck, MapPinOff, AlertCircle, Users } from "lucide-react";
 import { StatCard } from "@/components/admin/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +25,7 @@ export default function AdminDashboardPage() {
   if (isPending) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
+        {Array.from({ length: 9 }).map((_, i) => (
           <Skeleton key={i} className="h-24 w-full rounded-lg" />
         ))}
       </div>
@@ -36,6 +36,7 @@ export default function AdminDashboardPage() {
     <div className="flex flex-col gap-4">
       <h1 className="font-display text-h1 text-ink-900">Dashboard</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Registered users" value={stats.totalUsers} icon={Users} />
         <StatCard label="Live hostels" value={stats.totalHostels} icon={Building2} />
         <StatCard label="Reviews" value={stats.totalReviews} icon={Star} />
         <StatCard label="Pending submissions" value={stats.pendingSubmissions} icon={FileClock} tone="warning" />

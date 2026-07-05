@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, PlusCircle, FileClock, PenLine, Flag, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Building2, PlusCircle, FileClock, PenLine, Flag, Users, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -12,6 +12,7 @@ const TABS = [
   { href: "/admin/submissions", label: "Submissions", icon: FileClock },
   { href: "/admin/edit-requests", label: "Edit Requests", icon: PenLine },
   { href: "/admin/moderation", label: "Moderation", icon: Flag },
+  { href: "/admin/users", label: "Users", icon: Users },
 ];
 
 function isTabActive(href: string, pathname: string): boolean {

@@ -15,6 +15,7 @@ export interface Database {
           email: string | null;
           avatar_url: string | null;
           role: string;
+          is_suspended: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -24,6 +25,7 @@ export interface Database {
           email?: string | null;
           avatar_url?: string | null;
           role?: string;
+          is_suspended?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -33,6 +35,7 @@ export interface Database {
           email?: string | null;
           avatar_url?: string | null;
           role?: string;
+          is_suspended?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -483,6 +486,32 @@ export interface Database {
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      is_suspended: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      set_user_role: {
+        Args: { p_user_id: string; p_role: string };
+        Returns: undefined;
+      };
+      set_user_suspended: {
+        Args: { p_user_id: string; p_suspended: boolean };
+        Returns: undefined;
+      };
+      get_user_activity_counts: {
+        Args: { p_user_ids: string[] };
+        Returns: {
+          user_id: string;
+          review_count: number;
+          save_count: number;
+          submission_count: number;
+          owned_hostel_count: number;
+        }[];
+      };
+      delete_user_reviews: {
+        Args: { p_user_id: string };
+        Returns: number;
       };
       recalculate_hostel_rating: {
         Args: { p_hostel_id: string };

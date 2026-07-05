@@ -61,10 +61,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     supabase
       .from("profiles")
-      .select("id, full_name, email, avatar_url, role")
+      .select("id, full_name, email, avatar_url, role, is_suspended")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
+        if (data?.is_suspended) {
+          // The real backstop is server-side (a suspended account's own
+          // review/submission inserts are rejected by RLS regardless of
+          // this check) -- this is just the client-side kick-out so a
+          // suspended session doesn't keep browsing as if nothing happened.
+          supabase.auth.signOut();
+          setProfile(null);
+          return;
+        }
         setProfile(
           data
             ? {

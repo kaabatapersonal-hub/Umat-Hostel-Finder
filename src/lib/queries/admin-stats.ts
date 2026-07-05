@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
 export interface AdminStats {
+  totalUsers: number;
   totalHostels: number;
   totalReviews: number;
   pendingSubmissions: number;
@@ -20,6 +21,7 @@ export interface AdminStats {
 // cheap.
 export async function getAdminStats(supabase: SupabaseClient<Database>): Promise<AdminStats> {
   const [
+    totalUsers,
     totalHostels,
     totalReviews,
     pendingSubmissions,
@@ -29,6 +31,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     hostelsMissingCoordinates,
     featuredRows,
   ] = await Promise.all([
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("hostels").select("*", { count: "exact", head: true }),
     supabase.from("reviews").select("*", { count: "exact", head: true }),
     supabase.from("submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
@@ -40,6 +43,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
   ]);
 
   for (const result of [
+    totalUsers,
     totalHostels,
     totalReviews,
     pendingSubmissions,
@@ -58,6 +62,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
   ).length;
 
   return {
+    totalUsers: totalUsers.count ?? 0,
     totalHostels: totalHostels.count ?? 0,
     totalReviews: totalReviews.count ?? 0,
     pendingSubmissions: pendingSubmissions.count ?? 0,
