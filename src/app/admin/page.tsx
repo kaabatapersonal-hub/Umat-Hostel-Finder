@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Star, FileClock, Heart, PenLine, Flag, BadgeCheck, MapPinOff, AlertCircle, Users } from "lucide-react";
+import { Building2, Star, FileClock, Heart, PenLine, Flag, BadgeCheck, MapPinOff, AlertCircle, Users, MessageSquare } from "lucide-react";
 import { StatCard } from "@/components/admin/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +25,7 @@ export default function AdminDashboardPage() {
   if (isPending) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 9 }).map((_, i) => (
+        {Array.from({ length: 10 }).map((_, i) => (
           <Skeleton key={i} className="h-24 w-full rounded-lg" />
         ))}
       </div>
@@ -45,6 +45,7 @@ export default function AdminDashboardPage() {
         <StatCard label="Reported reviews" value={stats.reportedReviews} icon={Flag} tone="warning" />
         <StatCard label="Actively featured" value={stats.activeFeaturedHostels} icon={BadgeCheck} />
         <StatCard label="Missing coordinates" value={stats.hostelsMissingCoordinates} icon={MapPinOff} tone="warning" />
+        <StatCard label="Buzz posts" value={stats.totalBuzzPosts} icon={MessageSquare} />
       </div>
     </div>
   );

@@ -52,3 +52,34 @@ export function isSafeHttpUrl(value: string): boolean {
     return false;
   }
 }
+
+// Matches a Ghanaian mobile number embedded in free text -- "call
+// 0231234567" or "+233 20 000 0001 for details" inside a Buzz post. Tuned
+// for scanning a paragraph (lookaround guards against matching a slice of
+// a longer digit run), unlike isValidPhoneNumber above which validates a
+// whole dedicated form field. Only ever used to find candidate substrings
+// to hand to normalizePhoneNumber/buildTelLink -- never rendered as raw
+// HTML, so there's no injection surface here the way there is with
+// arbitrary URLs.
+const PHONE_IN_TEXT_REGEX = /(?<!\d)(?:\+?233\d{9}|0\d{9})(?!\d)/g;
+
+export interface TextSegment {
+  text: string;
+  isPhoneNumber: boolean;
+}
+
+export function splitOutPhoneNumbers(content: string): TextSegment[] {
+  const segments: TextSegment[] = [];
+  let lastIndex = 0;
+
+  for (const match of content.matchAll(PHONE_IN_TEXT_REGEX)) {
+    const index = match.index ?? 0;
+    if (index > lastIndex) segments.push({ text: content.slice(lastIndex, index), isPhoneNumber: false });
+    segments.push({ text: match[0], isPhoneNumber: true });
+    lastIndex = index + match[0].length;
+  }
+
+  if (lastIndex < content.length) segments.push({ text: content.slice(lastIndex), isPhoneNumber: false });
+
+  return segments;
+}

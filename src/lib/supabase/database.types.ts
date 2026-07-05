@@ -480,6 +480,92 @@ export interface Database {
           },
         ];
       };
+      buzz_posts: {
+        Row: {
+          id: string;
+          author_id: string;
+          author_name: string | null;
+          content: string;
+          is_admin_post: boolean;
+          is_pinned: boolean;
+          reply_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          author_id: string;
+          author_name?: string | null;
+          content: string;
+          is_admin_post?: boolean;
+          is_pinned?: boolean;
+          reply_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          author_id?: string;
+          author_name?: string | null;
+          content?: string;
+          is_admin_post?: boolean;
+          is_pinned?: boolean;
+          reply_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "buzz_posts_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      buzz_replies: {
+        Row: {
+          id: string;
+          post_id: string;
+          author_id: string;
+          author_name: string | null;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          author_id: string;
+          author_name?: string | null;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          author_id?: string;
+          author_name?: string | null;
+          content?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "buzz_replies_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "buzz_posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "buzz_replies_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {

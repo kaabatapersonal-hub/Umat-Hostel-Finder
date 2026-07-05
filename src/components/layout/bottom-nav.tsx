@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { Home, Map, Heart, User, type LucideIcon } from "lucide-react";
+import { Home, Map, MessageSquare, Heart, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -15,6 +15,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/map", label: "Map", icon: Map },
+  { href: "/buzz", label: "Buzz", icon: MessageSquare },
   { href: "/saved", label: "Saved", icon: Heart },
   { href: "/profile", label: "Profile", icon: User },
 ];

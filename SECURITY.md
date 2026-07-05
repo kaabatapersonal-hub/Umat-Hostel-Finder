@@ -52,6 +52,21 @@ the same adversarial treatment as everything else:
 - **Client-side kick-out is a UX nicety, not the security boundary.** `auth-provider.tsx` signs a suspended user out the next time it fetches their own profile (on load/auth-state-change). This was deliberately *not* added to `proxy.ts`'s middleware, which runs on every single request app-wide — a per-request DB round trip there for a rare edge case was judged not worth the blanket perf cost, given the RLS-layer enforcement above already holds regardless of what the client does.
 - **No actual sign-in denial.** "Suspended" doesn't stop Supabase Auth from issuing a fresh session to a suspended account's credentials — that would need a Dashboard-configured Auth Hook (a project-level setting, not a migration). In practice it doesn't matter: the moment that session's profile is fetched, they're signed back out, and every write they'd want to make is rejected regardless.
 
+## Session 17: Buzz
+
+Added a tweet-style community board — `buzz_posts` + `buzz_replies`,
+publicly readable, admin moderation. New public-write surface (anyone
+signed in can post, not just admin), so it got the fullest adversarial
+treatment yet:
+
+- **`author_name` is denormalized onto both tables — a deviation from the session brief's literal schema, made necessary by Session 15.** Buzz must be readable by signed-out visitors, but Session 15 tightened `profiles` SELECT to `id = auth.uid() or is_admin()` — a public reader can't join to another user's profile to get their name. `reviews.reviewer_name` already solved this exact problem the same way; this reuses that precedent rather than reopening the profiles lockdown or building a new public name-lookup RPC. Resolved once at post time by trigger, never client-settable, never live-synced to later profile-name changes (same philosophy as `reviewer_name`).
+- **`is_admin_post` and `author_name` are both trigger-recomputed on every insert/update**, ignoring whatever the client sent — verified via direct API that a non-admin including `is_admin_post: true` or a fake `author_name` in the request body gets silently overwritten.
+- **`is_pinned` can only be changed by an admin**, enforced in the same trigger despite RLS's row-level `author_id = auth.uid() or is_admin()` otherwise allowing an author to touch their own row — the same column-vs-row gap Session 15 hit with reviews' `is_resident`/`reported`. Verified: a non-admin author flipping `is_pinned` on their own post gets reverted.
+- **Pin cap of 3, trigger-enforced** (pinning a 4th auto-unpins the oldest) — verified with 4 real test posts pinned in sequence.
+- **Suspended accounts (Session 16) are blocked here too** — the same `not is_suspended()` check extended to Buzz's two insert policies, since spamming Buzz posts is exactly the same abuse pattern Session 16's suspend feature exists for. Verified with the same stale-session-token technique: suspend an account whose token was already issued, then use that token to attempt a post/reply — both rejected.
+- **A same-session bug the audit caught before this was ever committed:** the `reply_count`-tamper protection inside `protect_buzz_post_writes` (which reverts a client's attempt to PATCH `reply_count` directly) was *also* reverting the trigger-maintained recompute itself, since that recompute is just another UPDATE on `buzz_posts` and fired the same BEFORE UPDATE trigger. Every reply silently reset the count back to 0. Fixed with `pg_trigger_depth()` to distinguish a direct client statement (depth 1) from an update cascading in from another trigger (depth >1) — only the former resets `reply_count`. `is_pinned`'s protection didn't have this problem: its guard is `not is_admin()`, and `auth.uid()` stays the original caller's identity throughout a trigger cascade regardless of nesting, so an admin-initiated pin correctly sails through the pin-cap trigger's own cascading UPDATE without needing the same fix.
+- **No new RPCs at all.** Reads are public, writes are author-or-admin RLS (same shape as reviews), and pin/delete are both plain updates/deletes an admin's existing RLS grant already covers — unlike Session 16's `profiles.role`, there was no privilege gap here needing a `SECURITY DEFINER` bypass.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:

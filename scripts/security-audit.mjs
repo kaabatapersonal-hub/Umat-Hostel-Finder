@@ -667,6 +667,219 @@ async function main() {
   }
 
   // =====================================================================
+  // Buzz (Session 17): public read, author-or-admin write, is_admin_post/
+  // author_name/is_pinned tamper protection, reply_count + pin-cap
+  // triggers, suspend enforcement.
+  // =====================================================================
+  section("buzz");
+  {
+    // Clean slate from any previous interrupted run.
+    const leftovers = await get(strangerToken, `/buzz_posts?author_id=eq.${strangerUid}&select=id`);
+    for (const row of leftovers.body ?? []) await del(adminToken, `/buzz_posts?id=eq.${row.id}`);
+
+    const anonRead = await get(null, "/buzz_posts?select=id&limit=1");
+    check("anon can read buzz_posts (public feed)", Array.isArray(anonRead.body), `status ${anonRead.status}`);
+
+    const anonInsert = await post(null, "/buzz_posts", { author_id: strangerUid, content: "hax post from anon, should fail" });
+    check("anon cannot insert a buzz post", !anonInsert.ok, `status ${anonInsert.status}`);
+
+    const spoofAuthor = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: admin.user.id, content: "Spoofed author id test, should fail." },
+      "return=representation"
+    );
+    check("stranger cannot spoof author_id on a buzz post", !spoofAuthor.ok, `status ${spoofAuthor.status}`);
+
+    const tooShort = await post(strangerToken, "/buzz_posts", { author_id: strangerUid, content: "hi" });
+    check("a post under 5 chars is rejected (CHECK constraint)", !tooShort.ok, `status ${tooShort.status}`);
+
+    const tooLong = await post(strangerToken, "/buzz_posts", { author_id: strangerUid, content: "x".repeat(501) });
+    check("a post over 500 chars is rejected (CHECK constraint)", !tooLong.ok, `status ${tooLong.status}`);
+
+    const spoofBadge = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Trying to fake the official badge", is_admin_post: true },
+      "return=representation"
+    );
+    check(
+      "a non-admin cannot fake the Official badge (trigger forces is_admin_post=false)",
+      spoofBadge.ok && spoofBadge.body?.[0]?.is_admin_post === false,
+      JSON.stringify(spoofBadge.body)
+    );
+    const strangerPostId = spoofBadge.body?.[0]?.id;
+
+    const spoofAuthorName = await patch(
+      strangerToken,
+      `/buzz_posts?id=eq.${strangerPostId}`,
+      { author_name: "Totally Not The Real Name" },
+      "return=representation"
+    );
+    check(
+      "author_name is not client-settable (trigger recomputes it from the real profile)",
+      spoofAuthorName.body?.[0]?.author_name !== "Totally Not The Real Name",
+      JSON.stringify(spoofAuthorName.body)
+    );
+
+    const strangerSelfPin = await patch(
+      strangerToken,
+      `/buzz_posts?id=eq.${strangerPostId}`,
+      { is_pinned: true },
+      "return=representation"
+    );
+    check(
+      "a non-admin cannot pin their own post (trigger reverts it)",
+      strangerSelfPin.body?.[0]?.is_pinned === false,
+      JSON.stringify(strangerSelfPin.body)
+    );
+
+    const adminPinsIt = await patch(
+      adminToken,
+      `/buzz_posts?id=eq.${strangerPostId}`,
+      { is_pinned: true },
+      "return=representation"
+    );
+    check("admin CAN pin a post", adminPinsIt.body?.[0]?.is_pinned === true, JSON.stringify(adminPinsIt.body));
+    // Reset before the pin-cap test below so it starts from a clean slate.
+    await patch(adminToken, `/buzz_posts?id=eq.${strangerPostId}`, { is_pinned: false });
+
+    const adminPost = await post(
+      adminToken,
+      "/buzz_posts",
+      { author_id: admin.user.id, content: "[Buzz Audit] Admin announcement test post" },
+      "return=representation"
+    );
+    check(
+      "an admin's own post is auto-badged Official",
+      adminPost.ok && adminPost.body?.[0]?.is_admin_post === true,
+      JSON.stringify(adminPost.body)
+    );
+    const adminPostId = adminPost.body?.[0]?.id;
+
+    // Replies + reply_count trigger.
+    const replyInsert = await post(
+      strangerToken,
+      "/buzz_replies",
+      { post_id: adminPostId, author_id: strangerUid, content: "Audit test reply" },
+      "return=representation"
+    );
+    check("stranger can reply to a post", replyInsert.ok, JSON.stringify(replyInsert.body));
+    const replyId = replyInsert.body?.[0]?.id;
+
+    const postAfterReply = await get(adminToken, `/buzz_posts?id=eq.${adminPostId}&select=reply_count`);
+    check(
+      "reply_count increments after a reply is posted",
+      postAfterReply.body?.[0]?.reply_count === 1,
+      JSON.stringify(postAfterReply.body)
+    );
+
+    const spoofReplyAuthor = await post(strangerToken, "/buzz_replies", {
+      post_id: adminPostId,
+      author_id: admin.user.id,
+      content: "Spoofed reply author test",
+    });
+    check("stranger cannot spoof author_id on a reply", !spoofReplyAuthor.ok, `status ${spoofReplyAuthor.status}`);
+
+    const replyTooShort = await post(strangerToken, "/buzz_replies", { post_id: adminPostId, author_id: strangerUid, content: "x" });
+    check("a reply under 2 chars is rejected (CHECK constraint)", !replyTooShort.ok, `status ${replyTooShort.status}`);
+
+    const replyTooLong = await post(strangerToken, "/buzz_replies", {
+      post_id: adminPostId,
+      author_id: strangerUid,
+      content: "x".repeat(301),
+    });
+    check("a reply over 300 chars is rejected (CHECK constraint)", !replyTooLong.ok, `status ${replyTooLong.status}`);
+
+    if (hasDistinctOwner) {
+      const otherDeletesReply = await del(ownerToken, `/buzz_replies?id=eq.${replyId}`);
+      const replyStillExists = await get(adminToken, `/buzz_replies?id=eq.${replyId}&select=id`);
+      check(
+        "a different user cannot delete someone else's reply",
+        replyStillExists.body?.length === 1,
+        JSON.stringify(replyStillExists.body)
+      );
+
+      const otherDeletesPost = await del(ownerToken, `/buzz_posts?id=eq.${adminPostId}`);
+      const postStillExists = await get(adminToken, `/buzz_posts?id=eq.${adminPostId}&select=id`);
+      check(
+        "a different user cannot delete someone else's post",
+        postStillExists.body?.length === 1,
+        JSON.stringify(postStillExists.body)
+      );
+    } else {
+      skip("a different user cannot delete someone else's reply", "owner account not confirmed -- no second distinct identity available");
+      skip("a different user cannot delete someone else's post", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const adminDeletesReply = await del(adminToken, `/buzz_replies?id=eq.${replyId}`);
+    const postAfterDelete = await get(adminToken, `/buzz_posts?id=eq.${adminPostId}&select=reply_count`);
+    check(
+      "admin can delete any reply, and reply_count decrements back",
+      adminDeletesReply.ok && postAfterDelete.body?.[0]?.reply_count === 0,
+      JSON.stringify(postAfterDelete.body)
+    );
+
+    // Pin cap: 4 fresh posts, pinned in order -- pinning the 4th must
+    // auto-unpin the oldest of the 4 (whatever else is or isn't pinned
+    // elsewhere on a live feed, our 4 brand-new posts are always the most
+    // recently created, so the cap's "keep newest 3" rule always resolves
+    // in terms of these 4 relative to each other).
+    const capPostIds = [];
+    for (let i = 0; i < 4; i++) {
+      const created = await post(
+        adminToken,
+        "/buzz_posts",
+        { author_id: admin.user.id, content: `[Buzz Audit] Pin cap test post ${i}` },
+        "return=representation"
+      );
+      capPostIds.push(created.body?.[0]?.id);
+    }
+    for (const id of capPostIds) {
+      await patch(adminToken, `/buzz_posts?id=eq.${id}`, { is_pinned: true });
+    }
+    const pinnedAfterCap = await get(adminToken, `/buzz_posts?id=in.(${capPostIds.join(",")})&select=id,is_pinned`);
+    const stillPinnedIds = new Set((pinnedAfterCap.body ?? []).filter((r) => r.is_pinned).map((r) => r.id));
+    check(
+      "pinning a 4th post auto-unpins the oldest of the 4 (cap stays at 3)",
+      !stillPinnedIds.has(capPostIds[0]) && capPostIds.slice(1).every((id) => stillPinnedIds.has(id)),
+      JSON.stringify(pinnedAfterCap.body)
+    );
+
+    // Suspend enforcement (Session 16), extended to Buzz.
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
+
+    const suspendedPostAttempt = await post(strangerToken, "/buzz_posts", {
+      author_id: strangerUid,
+      content: "[Buzz Audit] Should be rejected -- suspended",
+    });
+    check(
+      "a suspended account's existing session cannot post to Buzz",
+      !suspendedPostAttempt.ok,
+      `status ${suspendedPostAttempt.status}`
+    );
+
+    const suspendedReplyAttempt = await post(strangerToken, "/buzz_replies", {
+      post_id: adminPostId,
+      author_id: strangerUid,
+      content: "Should be rejected -- suspended",
+    });
+    check(
+      "a suspended account's existing session cannot reply on Buzz",
+      !suspendedReplyAttempt.ok,
+      `status ${suspendedReplyAttempt.status}`
+    );
+
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+
+    // Cleanup -- delete every test post created in this section (cascades
+    // any remaining replies).
+    for (const id of [strangerPostId, adminPostId, ...capPostIds]) {
+      if (id) await del(adminToken, `/buzz_posts?id=eq.${id}`);
+    }
+  }
+
+  // =====================================================================
   // Storage: MIME allow-list, size cap, cross-user write scoping
   // =====================================================================
   section("storage");

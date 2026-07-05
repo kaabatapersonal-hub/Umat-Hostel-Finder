@@ -11,6 +11,7 @@ export interface AdminStats {
   reportedReviews: number;
   activeFeaturedHostels: number;
   hostelsMissingCoordinates: number;
+  totalBuzzPosts: number;
 }
 
 // Every number here is a Postgres COUNT via PostgREST's `count: "exact",
@@ -30,6 +31,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     reportedReviews,
     hostelsMissingCoordinates,
     featuredRows,
+    totalBuzzPosts,
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("hostels").select("*", { count: "exact", head: true }),
@@ -40,6 +42,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     supabase.from("reviews").select("*", { count: "exact", head: true }).eq("reported", true),
     supabase.from("hostels").select("*", { count: "exact", head: true }).or("latitude.is.null,longitude.is.null"),
     supabase.from("hostels").select("featured_until").eq("featured", true),
+    supabase.from("buzz_posts").select("*", { count: "exact", head: true }),
   ]);
 
   for (const result of [
@@ -52,6 +55,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     reportedReviews,
     hostelsMissingCoordinates,
     featuredRows,
+    totalBuzzPosts,
   ]) {
     if (result.error) throw result.error;
   }
@@ -71,5 +75,6 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     reportedReviews: reportedReviews.count ?? 0,
     hostelsMissingCoordinates: hostelsMissingCoordinates.count ?? 0,
     activeFeaturedHostels,
+    totalBuzzPosts: totalBuzzPosts.count ?? 0,
   };
 }
