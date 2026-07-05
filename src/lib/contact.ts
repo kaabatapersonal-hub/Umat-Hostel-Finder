@@ -35,3 +35,20 @@ export function buildTelLink(rawNumber: string): string {
 export function buildHostelInquiryMessage(hostelName: string): string {
   return `Hi, I'm interested in ${hostelName} (via UMaT Hostel Finder)`;
 }
+
+// contact/call_number are safe by construction (normalizePhoneNumber
+// strips everything but digits before a URL is ever built from them), but
+// whatsapp_group is a free-text URL column rendered directly as an
+// anchor's href with no such normalization. Nothing in the app writes it
+// today, but RLS is row-level, not column-level -- a direct API write (or
+// a future form that forgets this check) could still land a
+// `javascript:`/`data:` URL there, which would then execute in the app's
+// own origin the moment someone taps "Join Group". Session 15 hardening:
+// only ever render it if it's a plain https:// URL.
+export function isSafeHttpUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
