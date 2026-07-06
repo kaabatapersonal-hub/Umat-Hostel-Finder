@@ -30,3 +30,14 @@ export function useKeyboardInset(): number {
 
   return inset;
 }
+
+// A small threshold, not `inset > 0` -- minor viewport chrome changes (the
+// URL bar showing/hiding, an orientation nudge) can shift this by a few
+// tens of pixels with no keyboard involved at all. An actual on-screen
+// keyboard is always well over 100px tall.
+const KEYBOARD_OPEN_THRESHOLD_PX = 100;
+
+export function useIsKeyboardOpen(): boolean {
+  const inset = useKeyboardInset();
+  return inset > KEYBOARD_OPEN_THRESHOLD_PX;
+}

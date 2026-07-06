@@ -26,8 +26,6 @@ export function ComposeBuzzSheet({ open, onClose }: { open: boolean; onClose: ()
     createPost.mutate(trimmed, { onSuccess: handleClose });
   }
 
-  const tooShort = content.trim().length > 0 && content.trim().length < MIN_LENGTH;
-
   return (
     <Sheet open={open} onClose={handleClose} title="New post">
       <div className="flex flex-col gap-3">
@@ -37,13 +35,10 @@ export function ComposeBuzzSheet({ open, onClose }: { open: boolean; onClose: ()
           placeholder="What's the buzz? Availability, roommate search, a question about hostels near UMaT..."
           rows={5}
           autoFocus
-          error={
-            createPost.isError
-              ? "Couldn't post -- try again."
-              : tooShort
-                ? `At least ${MIN_LENGTH} characters.`
-                : undefined
-          }
+          // The Post button is already disabled below the minimum length --
+          // that's the feedback. No separate "too short" error message
+          // needed on top of it.
+          error={createPost.isError ? "Couldn't post -- try again." : undefined}
         />
         <div className="flex items-center justify-between">
           <span className={cn("text-caption", content.length > MAX_LENGTH - 20 ? "text-gold-600" : "text-ink-300")}>

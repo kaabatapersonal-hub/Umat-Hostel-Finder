@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { useBuzzPost } from "@/hooks/use-buzz-post";
 import { useBuzzReplies } from "@/hooks/use-buzz-replies";
 import { useCreateBuzzReply } from "@/hooks/use-create-buzz-reply";
-import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
+import { useKeyboardInset, useIsKeyboardOpen } from "@/hooks/use-keyboard-inset";
 
 const REPLY_MIN_LENGTH = 2;
 const REPLY_MAX_LENGTH = 300;
@@ -21,13 +21,26 @@ export function PostDetailView({ postId }: { postId: string }) {
   const router = useRouter();
   const { requireAuth } = useAuth();
   const keyboardInset = useKeyboardInset();
+  const isKeyboardOpen = useIsKeyboardOpen();
   const [replyText, setReplyText] = useState("");
+  const repliesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: post, isPending, isError, refetch } = useBuzzPost(postId);
   const repliesQuery = useBuzzReplies(postId);
   const createReply = useCreateBuzzReply();
 
   const replies = useMemo(() => repliesQuery.data?.pages.flatMap((page) => page.replies) ?? [], [repliesQuery.data]);
+
+  // The user may have scrolled up to read older replies before tapping the
+  // input -- once the keyboard actually opens (not on focus, which fires
+  // before the viewport has shrunk), bring the most recent reply back into
+  // view so the conversation they're replying to is what's visible, not
+  // wherever they happened to be scrolled to.
+  useEffect(() => {
+    if (isKeyboardOpen) {
+      repliesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [isKeyboardOpen]);
 
   function handleSend() {
     const trimmed = replyText.trim();
@@ -63,7 +76,7 @@ export function PostDetailView({ postId }: { postId: string }) {
         <>
           <BuzzPostCard post={post} linkToDetail={false} />
 
-          <h2 className="font-display text-h1 text-ink-900">Replies</h2>
+          <h2 className="font-display text-h1 text-ink-900">Replies ({post.replyCount})</h2>
 
           {repliesQuery.isPending ? (
             <div className="flex flex-col gap-2">
@@ -71,12 +84,13 @@ export function PostDetailView({ postId }: { postId: string }) {
               <Skeleton className="h-16 w-full rounded-md" />
             </div>
           ) : replies.length === 0 ? (
-            <p className="text-body-sm text-ink-300">No replies yet — start the conversation.</p>
+            <p className="text-body-sm text-ink-300">No replies yet — be the first to respond.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {replies.map((reply) => (
                 <ReplyCard key={reply.id} reply={reply} />
               ))}
+              <div ref={repliesEndRef} aria-hidden />
             </div>
           )}
 
@@ -95,7 +109,14 @@ export function PostDetailView({ postId }: { postId: string }) {
       {post && (
         <div
           className="fixed inset-x-0 z-40 flex items-center gap-2 border-t border-line bg-surface px-4 py-3"
-          style={{ bottom: keyboardInset || "calc(5rem + env(safe-area-inset-bottom))" }}
+          style={{
+            // Must agree with BottomNav's own isKeyboardOpen threshold --
+            // reacting to any nonzero inset here (while the nav is still
+            // using the higher threshold to decide whether to hide) would
+            // open a window where this bar sits too low and the still-
+            // visible nav overlaps it.
+            bottom: isKeyboardOpen ? keyboardInset : "calc(5rem + env(safe-area-inset-bottom))",
+          }}
         >
           <input
             value={replyText}
