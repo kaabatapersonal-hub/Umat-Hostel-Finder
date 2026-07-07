@@ -38,12 +38,24 @@ export const metadata: Metadata = {
     title: "UMaT Hostel Finder",
     description,
   },
+  // Generates both the Apple-specific tag and the generic
+  // mobile-web-app-capable tag -- makes "Add to Home Screen" launch full-
+  // screen (no browser chrome) instead of opening back into Safari/Chrome.
+  appleWebApp: {
+    capable: true,
+    title: "UMaT Hostel Finder",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0E4A34",
   width: "device-width",
   initialScale: 1,
+  // Without this, env(safe-area-inset-*) resolves to 0 on iOS regardless of
+  // how the CSS uses it -- the fixed bottom nav's safe-area padding (and the
+  // top bar's notch padding) have been silently no-ops without it.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

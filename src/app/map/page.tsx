@@ -51,7 +51,7 @@ function MapPageContent() {
   const listHref = queryString ? `/?${queryString}` : "/";
 
   return (
-    <div className="flex flex-col">
+    <div className="flex h-full flex-col">
       <PageHeader
         title="Map"
         subtitle={isPending ? "Loading hostels near UMaT…" : `${count} hostel${count === 1 ? "" : "s"} near UMaT`}
@@ -77,7 +77,15 @@ function MapPageContent() {
         </div>
       )}
 
-      <div className="relative mx-4 h-[70vh] min-h-96 overflow-hidden rounded-lg shadow-card">
+      {/* flex-1 + min-h-0 fills exactly whatever's left after the header/
+          filter chips/location banner above, instead of the old h-[70vh]
+          -- vh is the *largest* possible mobile viewport and has no
+          relationship to where the fixed top bar/bottom nav actually are,
+          which is what let this box's bottom edge end up underneath the
+          nav. min-h-0 overrides a flex item's default min-height:auto,
+          which would otherwise refuse to shrink below Leaflet's own
+          intrinsic sizing and push the whole page taller than the screen. */}
+      <div className="relative mx-4 flex-1 min-h-0 overflow-hidden rounded-lg shadow-card">
         {isPending ? (
           <MapSkeleton />
         ) : isError ? (

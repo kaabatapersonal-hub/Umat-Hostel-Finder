@@ -7,6 +7,7 @@ import { Search, Building2, AlertCircle, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { FilterChips } from "./filter-chips";
 import { HostelCard } from "./hostel-card";
 import { useHostels } from "@/hooks/use-hostels";
@@ -80,6 +81,7 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
   }
 
   return (
+    <PullToRefresh onRefresh={() => refetch()}>
     <div className="flex flex-col">
       {/* The one brand moment: a quiet dark-to-deeper-green gradient so the
           hero reads as a considered surface, not a flat color bar. The only
@@ -177,5 +179,6 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
         )}
       </section>
     </div>
+    </PullToRefresh>
   );
 }

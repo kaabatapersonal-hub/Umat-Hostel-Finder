@@ -20,30 +20,35 @@ const PULL_RESISTANCE = 0.5;
 export function PullToRefresh({ onRefresh, children }: { onRefresh: () => Promise<unknown>; children: React.ReactNode }) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const startYRef = useRef<number | null>(null);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
 
   function handleTouchStart(e: React.TouchEvent) {
     if (refreshing || window.scrollY > 0) {
-      startYRef.current = null;
+      startRef.current = null;
       return;
     }
-    startYRef.current = e.touches[0].clientY;
+    startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }
 
   function handleTouchMove(e: React.TouchEvent) {
-    if (startYRef.current === null || refreshing) return;
-    const delta = e.touches[0].clientY - startYRef.current;
-    if (delta > 0 && window.scrollY <= 0) {
-      setPull(Math.min(delta * PULL_RESISTANCE, MAX_PULL_PX));
+    const start = startRef.current;
+    if (!start || refreshing) return;
+    const deltaY = e.touches[0].clientY - start.y;
+    const deltaX = e.touches[0].clientX - start.x;
+    // A predominantly-horizontal drag (e.g. the app's tab-swipe gesture)
+    // must never also nudge this indicator -- only a genuinely vertical
+    // pull counts.
+    if (deltaY > 0 && deltaY > Math.abs(deltaX) && window.scrollY <= 0) {
+      setPull(Math.min(deltaY * PULL_RESISTANCE, MAX_PULL_PX));
     } else {
-      startYRef.current = null;
+      startRef.current = null;
       setPull(0);
     }
   }
 
   async function handleTouchEnd() {
-    if (startYRef.current === null) return;
-    startYRef.current = null;
+    if (startRef.current === null) return;
+    startRef.current = null;
     if (pull >= PULL_THRESHOLD_PX) {
       setRefreshing(true);
       setPull(0);

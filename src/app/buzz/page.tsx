@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BuzzPostCard } from "@/components/buzz/buzz-post-card";
 import { ComposeBuzzSheet } from "@/components/buzz/compose-buzz-sheet";
-import { PullToRefresh } from "@/components/buzz/pull-to-refresh";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useBuzzFeed } from "@/hooks/use-buzz-feed";
 import { usePinnedBuzzPosts } from "@/hooks/use-pinned-buzz-posts";
 import { useAuth } from "@/providers/auth-provider";

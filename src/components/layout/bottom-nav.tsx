@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Home, Map, MessageSquare, Heart, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsKeyboardOpen } from "@/hooks/use-keyboard-inset";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface NavItem {
   href: string;
@@ -20,6 +21,14 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/saved", label: "Saved", icon: Heart },
   { href: "/profile", label: "Profile", icon: User },
 ];
+
+// The nav's real rendered content height (py-2.5 top+bottom = 20px, size-6
+// icon = 24px, gap-1 = 4px, text-caption line-height 0.75rem*1.4 = 16.8px
+// -> 64.8px, rounded up) -- deliberately NOT including safe-area-inset-
+// bottom, which is a device-specific extra reserved separately (see
+// app-shell.tsx). Mirrors TOP_BAR_HEIGHT_PX's pattern so both fixed chrome
+// elements can be reasoned about in px, not guessed at.
+export const BOTTOM_NAV_HEIGHT_PX = 65;
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -54,10 +63,19 @@ export function BottomNav() {
                   if (isActive) {
                     e.preventDefault();
                     window.scrollTo({ top: 0, behavior: shouldReduceMotion ? "auto" : "smooth" });
+                    return;
                   }
+                  triggerHaptic();
                 }}
                 className="relative flex flex-col items-center justify-center gap-1 py-2.5 text-caption"
               >
+                {isActive && (
+                  <motion.div
+                    layoutId="bottom-nav-indicator"
+                    className="absolute inset-x-4 top-0 h-1 rounded-full bg-gold-500"
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                )}
                 <motion.span
                   whileTap={{ scale: 0.92 }}
                   transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}

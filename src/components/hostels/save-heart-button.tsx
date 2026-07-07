@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { useToggleSave } from "@/hooks/use-toggle-save";
+import { triggerHaptic } from "@/lib/haptics";
 import type { SaveableHostelInput } from "@/lib/queries/saved-hostels";
 
 export interface SaveHeartButtonProps {
@@ -24,6 +25,7 @@ export function SaveHeartButton({ hostel, className }: SaveHeartButtonProps) {
     // Cards wrap this in a <Link> — don't let the tap also navigate.
     e.preventDefault();
     e.stopPropagation();
+    triggerHaptic();
     requireAuth(() => {
       toggle.mutate({ hostel, isSaved });
     });

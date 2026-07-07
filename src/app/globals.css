@@ -160,12 +160,21 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  /* Every tab scrolls the plain document (no inner overflow containers
+     anywhere in the app) -- contained here stops a pull past the top/bottom
+     from bouncing the browser's own chrome (the "this is a web page"
+     tell) and, on Android Chrome, from also triggering the browser's own
+     native pull-to-refresh alongside the app's custom one. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
   background: var(--surface-muted);
   color: var(--ink-900);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 h1,
