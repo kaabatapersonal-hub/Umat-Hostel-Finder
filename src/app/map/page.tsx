@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Map as MapIcon, AlertCircle, List, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { TOP_BAR_HEIGHT_PX } from "@/components/layout/top-bar";
+import { BOTTOM_NAV_HEIGHT_PX } from "@/components/layout/bottom-nav";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChips } from "@/components/hostels/filter-chips";
 import { useMapHostels } from "@/hooks/use-map-hostels";
@@ -13,6 +15,16 @@ import { useHostelFilters } from "@/hooks/use-hostel-filters";
 import { useUserLocation } from "@/hooks/use-user-location";
 import { hostelMatchesFilters } from "@/lib/hostel-filters";
 import { DEFAULT_FILTERS } from "@/lib/queries/hostels";
+
+// Explicit and self-contained -- deliberately NOT relying on a `h-full`
+// chain up through main/SwipeableTabs's AnimatePresence wrapper, which
+// turned out not to reliably resolve to a real height (Leaflet's own
+// container has overflow-hidden, so when that chain came out to 0/auto
+// instead of a real number, the map was silently clipped to nothing).
+// This computes the actual on-screen gap between the fixed top bar and
+// bottom nav directly from dvh + their real pixel heights, with no
+// dependency on any ancestor's layout succeeding.
+const MAP_PAGE_HEIGHT = `calc(100dvh - ${TOP_BAR_HEIGHT_PX}px - ${BOTTOM_NAV_HEIGHT_PX}px - env(safe-area-inset-top) - env(safe-area-inset-bottom))`;
 
 // Leaflet touches `window` and must never be part of the server render --
 // ssr:false is the load-bearing part here. This also keeps the Leaflet
@@ -51,7 +63,7 @@ function MapPageContent() {
   const listHref = queryString ? `/?${queryString}` : "/";
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col" style={{ height: MAP_PAGE_HEIGHT }}>
       <PageHeader
         title="Map"
         subtitle={isPending ? "Loading hostels near UMaT…" : `${count} hostel${count === 1 ? "" : "s"} near UMaT`}
@@ -78,13 +90,12 @@ function MapPageContent() {
       )}
 
       {/* flex-1 + min-h-0 fills exactly whatever's left after the header/
-          filter chips/location banner above, instead of the old h-[70vh]
-          -- vh is the *largest* possible mobile viewport and has no
-          relationship to where the fixed top bar/bottom nav actually are,
-          which is what let this box's bottom edge end up underneath the
-          nav. min-h-0 overrides a flex item's default min-height:auto,
-          which would otherwise refuse to shrink below Leaflet's own
-          intrinsic sizing and push the whole page taller than the screen. */}
+          filter chips/location banner above -- safe here because the
+          direct parent above has a real, explicit height (MAP_PAGE_HEIGHT),
+          not an inherited h-full. min-h-0 overrides a flex item's default
+          min-height:auto, which would otherwise refuse to shrink below
+          Leaflet's own intrinsic sizing and push the whole page taller
+          than the screen. */}
       <div className="relative mx-4 flex-1 min-h-0 overflow-hidden rounded-lg shadow-card">
         {isPending ? (
           <MapSkeleton />
