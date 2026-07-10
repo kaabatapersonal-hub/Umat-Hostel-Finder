@@ -177,6 +177,55 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Cold-launch splash (rendered inline in layout.tsx, first child of <body>)
+   -- covers the gap between "blank tab" and "hydrated app" with the app's
+   own icon on brand green instead of a plain white flash, on every entry
+   point (browser tab, installed PWA, home-screen launch alike), not just
+   the native OS splash Android already builds from manifest.ts. Purely
+   decorative and never blocks interaction -- pointer-events is off for its
+   entire lifetime, and prefers-reduced-motion's global !important override
+   above already collapses both animations to near-instant. */
+#app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-800);
+  pointer-events: none;
+  animation: app-splash-out 1s ease forwards;
+}
+
+#app-splash svg {
+  width: 96px;
+  height: 96px;
+  animation: app-splash-icon-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes app-splash-icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes app-splash-out {
+  0%,
+  55% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
 h1,
 h2,
 h3,
