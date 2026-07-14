@@ -6,7 +6,10 @@ export interface PriceTagProps extends React.HTMLAttributes<HTMLSpanElement> {
   // ("GHS 1,500 – 3,500 / year") instead of a single price. Pass the
   // cheapest room's price as `amount` and the priciest as `max`.
   max?: number;
-  period?: string;
+  // Pass null to hide the "/ period" line entirely -- a one-off sale
+  // price (marketplace listings) isn't recurring rent, it's a single
+  // asking price with nothing to divide by.
+  period?: string | null;
   currency?: string;
 }
 
@@ -19,6 +22,7 @@ export function PriceTag({
   ...props
 }: PriceTagProps) {
   const isRange = max !== undefined && max !== amount;
+  const isFree = amount === 0 && !isRange;
 
   return (
     <span
@@ -29,10 +33,10 @@ export function PriceTag({
       {...props}
     >
       <span className="font-display text-body-strong font-semibold">
-        {currency} {amount.toLocaleString()}
+        {isFree ? "Free" : `${currency} ${amount.toLocaleString()}`}
         {isRange && ` – ${max.toLocaleString()}`}
       </span>
-      <span className="text-caption opacity-80">/ {period}</span>
+      {period && <span className="text-caption opacity-80">/ {period}</span>}
     </span>
   );
 }

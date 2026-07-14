@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileText, Heart, LogOut, Pencil, ShieldCheck, Trash2, UserCircle2, Building2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FileText, Heart, LogOut, Pencil, ShieldCheck, Trash2, UserCircle2, Building2, ShoppingBag, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,12 @@ import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { useMySubmissions } from "@/hooks/use-my-submissions";
 import { useDeleteSubmission } from "@/hooks/use-delete-submission";
 import { useMyOwnedHostels } from "@/hooks/use-my-owned-hostels";
+import { useMyMarketListings } from "@/hooks/use-my-market-listings";
+import { useSetMarketListingStatus } from "@/hooks/use-set-market-listing-status";
+import { useDeleteMarketListing } from "@/hooks/use-delete-market-listing";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
+import type { MarketListing } from "@/lib/queries/market";
 
 const SUBMISSION_STATUS_CONFIG: Record<string, { label: string; variant: "filling" | "available" | "full" }> = {
   pending: { label: "Pending", variant: "filling" },
@@ -77,11 +82,74 @@ function SubmissionRow({ submission }: { submission: SubmissionSummary }) {
   );
 }
 
+function MarketListingRow({ listing }: { listing: MarketListing }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const setStatus = useSetMarketListingStatus();
+  const deleteListing = useDeleteMarketListing();
+  const isSold = listing.status === "sold";
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-line bg-surface p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="line-clamp-1 text-body-strong text-ink-900">{listing.title}</span>
+          <span className="text-caption text-ink-500">{formatRelativeTime(listing.createdAt)}</span>
+        </div>
+        {isSold && <Badge variant="full">Sold</Badge>}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {confirmingDelete ? (
+          <>
+            <span className="flex-1 text-body-sm text-ink-500">Delete this listing?</span>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => deleteListing.mutate(listing.id)}
+              loading={deleteListing.isPending}
+              className="border-danger text-danger"
+            >
+              Delete
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStatus.mutate({ listingId: listing.id, status: isSold ? "active" : "sold" })}
+              loading={setStatus.isPending}
+            >
+              <CheckCircle2 className="size-3.5" />
+              {isSold ? "Relist" : "Mark sold"}
+            </Button>
+            <Link href={`/market/${listing.id}/edit`}>
+              <Button variant="ghost" size="sm">
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+            </Link>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 className="size-3.5" />
+              Delete
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { user, profile, loading, requireAuth, signOut } = useAuth();
+  const router = useRouter();
   const { data: saved = [], isPending: savedPending } = useSavedHostels();
   const { data: submissions = [], isPending: submissionsPending } = useMySubmissions();
   const { data: ownedHostels = [], isPending: ownedPending } = useMyOwnedHostels();
+  const { data: marketListings = [], isPending: marketListingsPending } = useMyMarketListings(user?.id);
 
   if (loading) {
     return (
@@ -197,6 +265,28 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-2">
             {submissions.map((submission) => (
               <SubmissionRow key={submission.id} submission={submission} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-h1 text-ink-900">My Marketplace Listings</h2>
+        {marketListingsPending ? (
+          <SkeletonRow />
+        ) : marketListings.length === 0 ? (
+          <EmptyState
+            icon={<ShoppingBag className="size-7" strokeWidth={1.75} />}
+            title="No listings yet"
+            description="Sell something you no longer need — it takes under a minute."
+            actionLabel="Sell something"
+            onAction={() => router.push("/market/sell")}
+            className="bg-surface shadow-card"
+          />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {marketListings.map((listing) => (
+              <MarketListingRow key={listing.id} listing={listing} />
             ))}
           </div>
         )}

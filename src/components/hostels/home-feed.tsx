@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { MarketBanner } from "@/components/market/market-banner";
 import { FilterChips } from "./filter-chips";
 import { HostelCard } from "./hostel-card";
 import { useHostels } from "@/hooks/use-hostels";
@@ -115,6 +116,10 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
           </div>
         </div>
       </section>
+
+      <div className="mx-auto w-full max-w-7xl px-4 pt-4 lg:px-6">
+        <MarketBanner />
+      </div>
 
       <div className="mx-auto w-full max-w-7xl">
         <FilterChips value={filters} onChange={setFilters} />

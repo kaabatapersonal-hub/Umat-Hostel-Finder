@@ -880,6 +880,192 @@ async function main() {
   }
 
   // =====================================================================
+  // market_listings + app_config (Session 19)
+  // =====================================================================
+  section("market");
+  {
+    // Clean slate from any previous interrupted run.
+    const leftovers = await get(strangerToken, `/market_listings?seller_id=eq.${strangerUid}&select=id`);
+    for (const row of leftovers.body ?? []) await del(adminToken, `/market_listings?id=eq.${row.id}`);
+
+    const anonRead = await get(null, "/market_listings?select=id&limit=1");
+    check("anon can read market_listings (public feed)", Array.isArray(anonRead.body), `status ${anonRead.status}`);
+
+    const anonInsert = await post(null, "/market_listings", {
+      seller_id: strangerUid,
+      title: "hax listing from anon",
+      price: 10,
+      category: "other",
+      contact: "233200000000",
+    });
+    check("anon cannot insert a market listing", !anonInsert.ok, `status ${anonInsert.status}`);
+
+    const spoofSeller = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: admin.user.id, title: "Spoofed seller id test", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    check("stranger cannot spoof seller_id on a listing", !spoofSeller.ok, `status ${spoofSeller.status}`);
+
+    const titleTooShort = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "ab",
+      price: 10,
+      category: "other",
+      contact: "233200000000",
+    });
+    check("a title under 3 chars is rejected (CHECK constraint)", !titleTooShort.ok, `status ${titleTooShort.status}`);
+
+    const negativePrice = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "[Market Audit] Negative price test",
+      price: -5,
+      category: "other",
+      contact: "233200000000",
+    });
+    check("a negative price is rejected (CHECK constraint)", !negativePrice.ok, `status ${negativePrice.status}`);
+
+    const badCategory = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "[Market Audit] Bad category test",
+      price: 10,
+      category: "not_a_real_category",
+      contact: "233200000000",
+    });
+    check("an invalid category is rejected (CHECK constraint)", !badCategory.ok, `status ${badCategory.status}`);
+
+    const spoofIsService = await post(
+      strangerToken,
+      "/market_listings",
+      {
+        seller_id: strangerUid,
+        title: "[Market Audit] Fake is_service test",
+        price: 10,
+        category: "electronics",
+        contact: "233200000000",
+        is_service: true,
+      },
+      "return=representation"
+    );
+    check(
+      "is_service is derived from category, not client-settable (electronics -> false even when true is sent)",
+      spoofIsService.ok && spoofIsService.body?.[0]?.is_service === false,
+      JSON.stringify(spoofIsService.body)
+    );
+    const strangerListingId = spoofIsService.body?.[0]?.id;
+
+    const realService = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Real service listing", price: 20, category: "services", contact: "233200000000" },
+      "return=representation"
+    );
+    check(
+      "a services-category listing is auto-marked is_service=true",
+      realService.ok && realService.body?.[0]?.is_service === true,
+      JSON.stringify(realService.body)
+    );
+    const serviceListingId = realService.body?.[0]?.id;
+
+    const spoofUpdate = await patch(
+      strangerToken,
+      `/market_listings?id=eq.${strangerListingId}`,
+      { seller_id: admin.user.id, views_count: 999 },
+      "return=representation"
+    );
+    check(
+      "seller_id/views_count cannot be changed on update (trigger pins them)",
+      spoofUpdate.body?.[0]?.seller_id === strangerUid && spoofUpdate.body?.[0]?.views_count === 0,
+      JSON.stringify(spoofUpdate.body)
+    );
+
+    const sellerMarksSold = await patch(
+      strangerToken,
+      `/market_listings?id=eq.${strangerListingId}`,
+      { status: "sold" },
+      "return=representation"
+    );
+    check("seller CAN mark their own listing sold", sellerMarksSold.body?.[0]?.status === "sold", JSON.stringify(sellerMarksSold.body));
+
+    const sellerSelfRemove = await patch(
+      strangerToken,
+      `/market_listings?id=eq.${strangerListingId}`,
+      { status: "removed" },
+      "return=representation"
+    );
+    check(
+      "a non-admin cannot set status='removed' (trigger reverts it)",
+      sellerSelfRemove.body?.[0]?.status !== "removed",
+      JSON.stringify(sellerSelfRemove.body)
+    );
+
+    const adminRemoves = await patch(
+      adminToken,
+      `/market_listings?id=eq.${strangerListingId}`,
+      { status: "removed" },
+      "return=representation"
+    );
+    check("admin CAN set status='removed'", adminRemoves.body?.[0]?.status === "removed", JSON.stringify(adminRemoves.body));
+
+    if (hasDistinctOwner) {
+      const otherUpdate = await patch(ownerToken, `/market_listings?id=eq.${serviceListingId}`, { title: "hax" }, "return=representation");
+      check("a different user cannot update someone else's listing", !otherUpdate.body || otherUpdate.body.length === 0);
+
+      const otherDelete = await del(ownerToken, `/market_listings?id=eq.${serviceListingId}`);
+      const stillExists = await get(adminToken, `/market_listings?id=eq.${serviceListingId}&select=id`);
+      check("a different user cannot delete someone else's listing", stillExists.body?.length === 1);
+    } else {
+      skip("a different user cannot update someone else's listing", "owner account not confirmed -- no second distinct identity available");
+      skip("a different user cannot delete someone else's listing", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const viewsBefore = await get(adminToken, `/market_listings?id=eq.${serviceListingId}&select=views_count`);
+    const viewIncrement = await rpc(null, "increment_listing_views", { p_listing_id: serviceListingId });
+    const viewsAfter = await get(adminToken, `/market_listings?id=eq.${serviceListingId}&select=views_count`);
+    check(
+      "increment_listing_views is anon-callable and increments the count",
+      viewIncrement.ok && viewsAfter.body?.[0]?.views_count === (viewsBefore.body?.[0]?.views_count ?? 0) + 1,
+      JSON.stringify(viewsAfter.body)
+    );
+
+    const feedCall = await rpc(null, "get_market_feed", { p_limit: 5 });
+    check("get_market_feed is anon-callable and returns an array", feedCall.ok && Array.isArray(feedCall.body), JSON.stringify(feedCall.body)?.slice(0, 200));
+
+    const sellerProfileCall = await rpc(strangerToken, "get_seller_public_profile", { p_seller_id: admin.user.id });
+    const sellerProfileRow = sellerProfileCall.body?.[0];
+    check(
+      "get_seller_public_profile returns name/join-date but never email",
+      sellerProfileCall.ok && sellerProfileRow && !("email" in sellerProfileRow),
+      JSON.stringify(sellerProfileCall.body)
+    );
+
+    // Suspend enforcement, extended to the marketplace.
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
+    const suspendedListingAttempt = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "[Market Audit] Should be rejected -- suspended",
+      price: 10,
+      category: "other",
+      contact: "233200000000",
+    });
+    check("a suspended account's existing session cannot post a listing", !suspendedListingAttempt.ok, `status ${suspendedListingAttempt.status}`);
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+
+    // app_config: publicly readable, but not writable by anon/authenticated.
+    const anonReadsConfig = await get(null, "/app_config?key=eq.marketplace_enabled&select=key,value");
+    check("anon can read app_config (needed to gate /market client-side too)", Array.isArray(anonReadsConfig.body), JSON.stringify(anonReadsConfig.body));
+
+    const strangerWritesConfig = await patch(strangerToken, "/app_config?key=eq.marketplace_enabled", { value: true }, "return=representation");
+    check("a non-admin cannot write app_config", !strangerWritesConfig.body || strangerWritesConfig.body.length === 0);
+
+    // Cleanup.
+    for (const id of [strangerListingId, serviceListingId]) {
+      if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
+    }
+  }
+
+  // =====================================================================
   // Storage: MIME allow-list, size cap, cross-user write scoping
   // =====================================================================
   section("storage");
@@ -927,6 +1113,35 @@ async function main() {
       skip("cross-user delete check", "owner account not confirmed -- no second distinct identity available");
       // Still clean up the uploaded object as the uploader.
       await fetch(`${SUPABASE_URL}/storage/v1/object/hostel-images/${pngPath}`, {
+        method: "DELETE",
+        headers: { apikey: ANON_KEY, Authorization: `Bearer ${strangerToken}` },
+      });
+    }
+
+    // market-images (Session 19) -- same hardening, applied at creation
+    // time rather than bolted on after the fact like the other two.
+    const marketSvgUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/market-images/security-audit-test.svg`, {
+      method: "POST",
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${strangerToken}`, "Content-Type": "image/svg+xml" },
+      body: tinySvg,
+    });
+    check("an SVG upload to market-images is rejected by the MIME allow-list", !marketSvgUpload.ok, `status ${marketSvgUpload.status}`);
+    if (marketSvgUpload.ok) {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/market-images/security-audit-test.svg`, {
+        method: "DELETE",
+        headers: { apikey: ANON_KEY, Authorization: `Bearer ${strangerToken}` },
+      });
+    }
+
+    const marketPngPath = `security-audit-test-${Date.now()}.png`;
+    const marketPngUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/market-images/${marketPngPath}`, {
+      method: "POST",
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${strangerToken}`, "Content-Type": "image/png" },
+      body: tinyPng,
+    });
+    check("a real PNG upload to market-images still succeeds", marketPngUpload.ok, `status ${marketPngUpload.status}`);
+    if (marketPngUpload.ok) {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/market-images/${marketPngPath}`, {
         method: "DELETE",
         headers: { apikey: ANON_KEY, Authorization: `Bearer ${strangerToken}` },
       });

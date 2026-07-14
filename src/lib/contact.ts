@@ -36,6 +36,10 @@ export function buildHostelInquiryMessage(hostelName: string): string {
   return `Hi, I'm interested in ${hostelName} (via UMaT Hostel Finder)`;
 }
 
+export function buildMarketInquiryMessage(listingTitle: string): string {
+  return `Hi, I'm interested in your listing "${listingTitle}" on UMaT Hostel Finder Marketplace`;
+}
+
 // contact/call_number are safe by construction (normalizePhoneNumber
 // strips everything but digits before a URL is ever built from them), but
 // whatsapp_group is a free-text URL column rendered directly as an

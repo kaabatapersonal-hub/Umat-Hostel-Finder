@@ -12,6 +12,8 @@ export interface AdminStats {
   activeFeaturedHostels: number;
   hostelsMissingCoordinates: number;
   totalBuzzPosts: number;
+  activeMarketListings: number;
+  marketListingsToday: number;
 }
 
 // Every number here is a Postgres COUNT via PostgREST's `count: "exact",
@@ -32,6 +34,8 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     hostelsMissingCoordinates,
     featuredRows,
     totalBuzzPosts,
+    activeMarketListings,
+    marketListingsToday,
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("hostels").select("*", { count: "exact", head: true }),
@@ -43,6 +47,11 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     supabase.from("hostels").select("*", { count: "exact", head: true }).or("latitude.is.null,longitude.is.null"),
     supabase.from("hostels").select("featured_until").eq("featured", true),
     supabase.from("buzz_posts").select("*", { count: "exact", head: true }),
+    supabase.from("market_listings").select("*", { count: "exact", head: true }).eq("status", "active"),
+    supabase
+      .from("market_listings")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString()),
   ]);
 
   for (const result of [
@@ -56,6 +65,8 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     hostelsMissingCoordinates,
     featuredRows,
     totalBuzzPosts,
+    activeMarketListings,
+    marketListingsToday,
   ]) {
     if (result.error) throw result.error;
   }
@@ -76,5 +87,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     hostelsMissingCoordinates: hostelsMissingCoordinates.count ?? 0,
     activeFeaturedHostels,
     totalBuzzPosts: totalBuzzPosts.count ?? 0,
+    activeMarketListings: activeMarketListings.count ?? 0,
+    marketListingsToday: marketListingsToday.count ?? 0,
   };
 }

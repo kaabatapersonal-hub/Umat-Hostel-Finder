@@ -1,12 +1,13 @@
 import { splitOutPhoneNumbers, buildTelLink } from "@/lib/contact";
 import { cn } from "@/lib/utils";
 
-// Renders post/reply text with any embedded Ghana phone number turned into
-// a tappable tel: link -- the "call 023..." pattern this whole feature
-// exists for. Deliberately scoped to phone numbers only, not arbitrary
-// URLs -- linkifying user-supplied URL text would mean building and
-// trusting a live href out of free text, a much larger surface than
-// reusing the already-safe-by-construction tel: builder.
+// Renders free text with any embedded Ghana phone number turned into a
+// tappable tel: link -- the "call 023..." pattern Buzz posts and
+// marketplace listing descriptions both benefit from. Deliberately scoped
+// to phone numbers only, not arbitrary URLs -- linkifying user-supplied
+// URL text would mean building and trusting a live href out of free text,
+// a much larger surface than reusing the already-safe-by-construction
+// tel: builder.
 export function LinkifiedContent({ content, className }: { content: string; className?: string }) {
   const segments = splitOutPhoneNumbers(content);
 

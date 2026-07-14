@@ -566,6 +566,96 @@ export interface Database {
           },
         ];
       };
+      market_listings: {
+        Row: {
+          id: string;
+          seller_id: string;
+          title: string;
+          description: string | null;
+          price: number;
+          category: string;
+          condition: string | null;
+          images: Json;
+          contact: string;
+          is_service: boolean;
+          status: string;
+          is_leaving_sale: boolean;
+          hostel_id: string | null;
+          views_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          seller_id: string;
+          title: string;
+          description?: string | null;
+          price: number;
+          category: string;
+          condition?: string | null;
+          images?: Json;
+          contact: string;
+          is_service?: boolean;
+          status?: string;
+          is_leaving_sale?: boolean;
+          hostel_id?: string | null;
+          views_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          seller_id?: string;
+          title?: string;
+          description?: string | null;
+          price?: number;
+          category?: string;
+          condition?: string | null;
+          images?: Json;
+          contact?: string;
+          is_service?: boolean;
+          status?: string;
+          is_leaving_sale?: boolean;
+          hostel_id?: string | null;
+          views_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "market_listings_seller_id_fkey";
+            columns: ["seller_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "market_listings_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      app_config: {
+        Row: {
+          key: string;
+          value: Json;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value: Json;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -654,6 +744,44 @@ export interface Database {
           is_actively_featured: boolean;
         }[];
       };
+      increment_listing_views: {
+        Args: { p_listing_id: string };
+        Returns: undefined;
+      };
+      get_market_feed: {
+        Args: {
+          p_search?: string | null;
+          p_category?: string | null;
+          p_condition?: string | null;
+          p_free_only?: boolean;
+          p_price_min?: number | null;
+          p_price_max?: number | null;
+          p_sort?: string;
+          p_cursor_created_at?: string | null;
+          p_cursor_price?: number | null;
+          p_cursor_id?: string | null;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          seller_id: string;
+          title: string;
+          description: string | null;
+          price: number;
+          category: string;
+          condition: string | null;
+          images: Json;
+          contact: string;
+          is_service: boolean;
+          is_leaving_sale: boolean;
+          views_count: number;
+          created_at: string;
+        }[];
+      };
+      get_seller_public_profile: {
+        Args: { p_seller_id: string };
+        Returns: { full_name: string | null; created_at: string }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
@@ -672,3 +800,15 @@ export type Availability = "available" | "filling" | "full";
 export type ProfileRole = "student" | "admin";
 export type SubmissionStatus = "pending" | "approved" | "rejected";
 export type RoommateRequestStatus = "pending" | "accepted" | "declined";
+export type MarketCategory =
+  | "hostel_essentials"
+  | "academics"
+  | "electronics"
+  | "fashion"
+  | "kitchen"
+  | "transport"
+  | "gaming"
+  | "services"
+  | "other";
+export type MarketCondition = "new" | "like_new" | "good" | "fair";
+export type MarketListingStatus = "active" | "sold" | "removed";

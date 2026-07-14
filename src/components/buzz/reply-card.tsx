@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LinkifiedContent } from "./linkified-content";
+import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { PostActionsMenu } from "./post-actions-menu";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzReply } from "@/hooks/use-delete-buzz-reply";

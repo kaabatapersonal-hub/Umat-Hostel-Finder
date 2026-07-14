@@ -67,6 +67,25 @@ treatment yet:
 - **A same-session bug the audit caught before this was ever committed:** the `reply_count`-tamper protection inside `protect_buzz_post_writes` (which reverts a client's attempt to PATCH `reply_count` directly) was *also* reverting the trigger-maintained recompute itself, since that recompute is just another UPDATE on `buzz_posts` and fired the same BEFORE UPDATE trigger. Every reply silently reset the count back to 0. Fixed with `pg_trigger_depth()` to distinguish a direct client statement (depth 1) from an update cascading in from another trigger (depth >1) — only the former resets `reply_count`. `is_pinned`'s protection didn't have this problem: its guard is `not is_admin()`, and `auth.uid()` stays the original caller's identity throughout a trigger cascade regardless of nesting, so an admin-initiated pin correctly sails through the pin-cap trigger's own cascading UPDATE without needing the same fix.
 - **No new RPCs at all.** Reads are public, writes are author-or-admin RLS (same shape as reviews), and pin/delete are both plain updates/deletes an admin's existing RLS grant already covers — unlike Session 16's `profiles.role`, there was no privilege gap here needing a `SECURITY DEFINER` bypass.
 
+## Session 19: Student Marketplace (Part 1)
+
+Added `market_listings` (buy/sell/trade between students) behind a new
+`app_config` feature-flag table, gated off by default. The moderation
+model deliberately mirrors Buzz, not the hostel-submissions queue: live
+immediately via public RLS insert, admin moderates after the fact — a
+marketplace listing is much higher-volume and lower-stakes than a hostel
+record, and requiring admin pre-approval on every listing would kill the
+"under 60 seconds to post" goal outright.
+
+- **Seller info needed a new small public RPC (`get_seller_public_profile`), not a denormalized column.** A listing detail page needs the seller's name and join date, and Session 15 locked `profiles` SELECT to self-or-admin — the same wall Buzz hit. But a listing only needs this once, on demand, at detail-view time (unlike a feed row, which needs a name on every single card) — a small `SECURITY DEFINER` RPC returning only `full_name`/`created_at` (never `email`/`role`) is a better fit here than another denormalized column that could drift from the real profile. Verified via direct API that the response never includes `email`.
+- **`is_service` is trigger-derived from `category`, never client-settable** — verified a listing posted with `category: "electronics", is_service: true` comes back `is_service: false` regardless.
+- **`status` can only move to `'removed'` (the admin moderation hide) if the caller is admin** — same column-vs-row gap as Buzz's `is_pinned`/reviews' `is_resident`. Sellers can still freely toggle `active`/`sold` on their own listing (that's the point of "mark as sold"); only the moderation state is gated. Verified: a seller PATCHing their own listing to `status: 'removed'` gets reverted; an admin doing the same succeeds.
+- **A real bug the audit caught before this ever shipped:** the same trigger's `seller_id`/`views_count` tamper-protection (pinning both to their old values on every update, so a seller can't PATCH `views_count: 999999` alongside a legitimate edit) was *also* undoing `increment_listing_views`' own legitimate increment — that RPC's `UPDATE ... SET views_count = views_count + 1` looks identical to a tamper attempt from inside a row trigger, which has no way to know *which function* issued an UPDATE. Fixed by scoping the trigger to `BEFORE UPDATE OF <every column except views_count>` — Postgres only fires an "UPDATE OF column list" trigger when the statement's own SET clause names one of those columns, regardless of what any other trigger does afterward. A pure view-count-only update (the RPC's own statement) never fires this trigger at all now; any real edit — even one bundling a `views_count` tamper attempt alongside a legitimate field change — still fires it and still gets `views_count` reset. Caught by the audit script's own before-and-after `views_count` check, not by inspection.
+- **`increment_listing_views` is intentionally anon-callable and unrate-limited.** A view is just a read; gating it behind auth would undercount every anonymous browse, and the worst case of no rate-limiting is an inflated-but-harmless popularity number, not a security issue — not worth dedup/abuse-detection machinery for a launch-week feature.
+- **The `marketplace_enabled` flag had to be marked `export const dynamic = "force-dynamic"` on `/market/page.tsx`.** Without it, Next statically prerenders the page at build time (no `cookies()`/`searchParams` dependency to signal otherwise) and bakes in whatever the flag happened to be during that build — flipping it in the database would then need a full redeploy to take effect, defeating the entire point of a flag you can flip without one. Caught by inspecting the build's own route-type output (`○` static vs `ƒ` dynamic), not by a runtime test.
+- **`app_config` is publicly readable, admin-writable-only.** The client needs to know whether to show the teaser or the real feed, so read access has to be public; write access is gated the same `is_admin()` way as every other admin-only table. Verified a non-admin PATCH to `app_config` is rejected.
+- **`market-images` storage bucket was hardened at creation**, not bolted on after the fact the way Session 15 had to retrofit `hostel-images`/`room-images` — same 10MB cap, same JPEG/PNG/WebP allow-list, applied in the same migration that creates the bucket.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:
@@ -86,7 +105,7 @@ None of these are migratable; they're account or project settings only a human w
 - [ ] **Auth rate limits** — Authentication → Rate Limits: confirm the defaults for sign-in/sign-up/OTP attempts are on and reasonable.
 - [ ] **Supabase linter/advisor** — Database → Advisors: run it, review anything flagged.
 - [ ] **Database backups** — confirm automatic backups are enabled (or take a manual one before any future risky migration).
-- [ ] **Storage bucket public-read scoping** — confirm only `hostel-images`/`room-images` are public, nothing else.
+- [ ] **Storage bucket public-read scoping** — confirm only `hostel-images`/`room-images`/`market-images` are public, nothing else.
 - [ ] **2FA + a strong, unique password** on GitHub, Vercel, Supabase, and Resend accounts. This one's genuinely yours — not something that can be done from code or a script.
 
 ## Pre-release checklist

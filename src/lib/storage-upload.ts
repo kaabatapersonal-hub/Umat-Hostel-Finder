@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type StorageBucket = "hostel-images" | "room-images";
+export type StorageBucket = "hostel-images" | "room-images" | "market-images";
 
 function randomFileName(): string {
   const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).slice(2);

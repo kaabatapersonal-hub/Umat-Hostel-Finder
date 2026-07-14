@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { LinkifiedContent } from "./linkified-content";
+import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { PostActionsMenu } from "./post-actions-menu";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
