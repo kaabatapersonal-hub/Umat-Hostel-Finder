@@ -782,6 +782,10 @@ export interface Database {
         Args: { p_seller_id: string };
         Returns: { full_name: string | null; created_at: string }[];
       };
+      toggle_marketplace: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

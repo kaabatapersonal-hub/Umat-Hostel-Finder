@@ -1059,6 +1059,30 @@ async function main() {
     const strangerWritesConfig = await patch(strangerToken, "/app_config?key=eq.marketplace_enabled", { value: true }, "return=representation");
     check("a non-admin cannot write app_config", !strangerWritesConfig.body || strangerWritesConfig.body.length === 0);
 
+    // toggle_marketplace -- this runs against the *live* database, so the
+    // flag's real value is read first and restored at the end regardless
+    // of what it started as. Never leave the live site's marketplace
+    // gate in a different state than this test found it in.
+    const originalEnabled = anonReadsConfig.body?.[0]?.value === true;
+
+    const strangerToggles = await rpc(strangerToken, "toggle_marketplace", {});
+    check("a non-admin cannot call toggle_marketplace", !strangerToggles.ok, `status ${strangerToggles.status}`);
+
+    const adminTogglesOnce = await rpc(adminToken, "toggle_marketplace", {});
+    check(
+      "admin CAN call toggle_marketplace, and it flips the flag",
+      adminTogglesOnce.ok && adminTogglesOnce.body === !originalEnabled,
+      JSON.stringify(adminTogglesOnce.body)
+    );
+
+    // Restore -- toggling a second time flips it back to where it started.
+    const adminTogglesBack = await rpc(adminToken, "toggle_marketplace", {});
+    check(
+      "toggling a second time restores the original value",
+      adminTogglesBack.ok && adminTogglesBack.body === originalEnabled,
+      JSON.stringify(adminTogglesBack.body)
+    );
+
     // Cleanup.
     for (const id of [strangerListingId, serviceListingId]) {
       if (id) await del(adminToken, `/market_listings?id=eq.${id}`);

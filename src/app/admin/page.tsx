@@ -15,6 +15,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { StatCard } from "@/components/admin/stat-card";
+import { MarketplaceToggle } from "@/components/admin/marketplace-toggle";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminStats } from "@/hooks/use-admin-stats";
@@ -48,6 +49,7 @@ export default function AdminDashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-display text-h1 text-ink-900">Dashboard</h1>
+      <MarketplaceToggle />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Registered users" value={stats.totalUsers} icon={Users} />
         <StatCard label="Live hostels" value={stats.totalHostels} icon={Building2} />
