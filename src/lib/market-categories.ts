@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Sofa, GraduationCap, Laptop, Shirt, CookingPot, Bike, Gamepad2, Wrench, Package } from "lucide-react";
-import type { MarketCategory, MarketCondition } from "@/lib/supabase/database.types";
+import type { MarketCategory, MarketCondition, MarketServiceType } from "@/lib/supabase/database.types";
 
 // Categories are a fixed, closed set (a CHECK constraint, not free text like
 // hostel facilities) -- no fallback-icon/custom-entry half needed the way
@@ -54,4 +54,32 @@ export const MARKET_CONDITION_ORDER: MarketCondition[] = ["new", "like_new", "go
 export function conditionLabel(condition: string | null): string | null {
   if (!condition) return null;
   return MARKET_CONDITION_LABELS[condition as MarketCondition] ?? condition;
+}
+
+// Sub-tags for category="services" only -- lets a tutor/barber/designer be
+// found by what they actually offer, since "Services" alone is too broad a
+// bucket to browse or filter meaningfully.
+const SERVICE_TYPE_LABELS: Record<MarketServiceType, string> = {
+  tutoring: "Tutoring",
+  design: "Design",
+  programming: "Programming",
+  laundry: "Laundry",
+  haircut_barber: "Haircut / Barber",
+  photography: "Photography",
+  other: "Other",
+};
+
+export const SERVICE_TYPE_ORDER: MarketServiceType[] = [
+  "tutoring",
+  "design",
+  "programming",
+  "laundry",
+  "haircut_barber",
+  "photography",
+  "other",
+];
+
+export function serviceTypeLabel(serviceType: string | null): string | null {
+  if (!serviceType) return null;
+  return SERVICE_TYPE_LABELS[serviceType as MarketServiceType] ?? serviceType;
 }

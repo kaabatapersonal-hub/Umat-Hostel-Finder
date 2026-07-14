@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AlertCircle, MessageCircle, Share2, Check } from "lucide-react";
+import { useEffect, useRef } from "react";
+import Link from "next/link";
+import { AlertCircle, MessageCircle, Share2, Check, Building2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,9 @@ import { SellerInfoCard } from "./seller-info-card";
 import { RelatedMarketListingsSection } from "./related-market-listings-section";
 import { useMarketListing } from "@/hooks/use-market-listing";
 import { useIncrementListingViews } from "@/hooks/use-increment-listing-views";
-import { categoryLabel, conditionLabel } from "@/lib/market-categories";
+import { useHostelOptions } from "@/hooks/use-hostel-options";
+import { useShare } from "@/hooks/use-share";
+import { categoryLabel, conditionLabel, serviceTypeLabel } from "@/lib/market-categories";
 import { buildWhatsAppLink, buildMarketInquiryMessage } from "@/lib/contact";
 import { formatRelativeTime, cn } from "@/lib/utils";
 
@@ -20,7 +23,11 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
   const { data: listing, isPending, isError, refetch } = useMarketListing(listingId);
   const incrementViews = useIncrementListingViews();
   const hasCountedView = useRef(false);
-  const [copied, setCopied] = useState(false);
+  const { share, copied } = useShare();
+  // Only fetched to resolve hostel_id -> a hostel name for the reverse
+  // link below; a small, cached, app-wide list (see the hook), not a
+  // per-listing fetch.
+  const { data: hostelOptions } = useHostelOptions();
 
   useEffect(() => {
     if (hasCountedView.current) return;
@@ -31,25 +38,9 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingId]);
 
-  async function handleShare() {
+  function handleShare() {
     if (!listing) return;
-    const url = `${window.location.origin}/market/${listing.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: listing.title, url });
-      } catch {
-        // User dismissed the share sheet -- not an error worth surfacing.
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API can be unavailable (permissions, insecure context) --
-      // silently do nothing rather than show a broken share affordance.
-    }
+    share(listing.title, `${window.location.origin}/market/${listing.id}`);
   }
 
   if (isPending) {
@@ -79,8 +70,10 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
     );
   }
 
-  const whatsappLink = buildWhatsAppLink(listing.contact, buildMarketInquiryMessage(listing.title));
+  const whatsappLink = buildWhatsAppLink(listing.contact, buildMarketInquiryMessage(listing.title, listing.isService));
   const condition = conditionLabel(listing.condition);
+  const serviceType = serviceTypeLabel(listing.serviceType);
+  const hostelName = listing.hostelId ? hostelOptions?.find((h) => h.id === listing.hostelId)?.name : null;
 
   return (
     <div className="flex flex-col gap-5 pb-8">
@@ -89,14 +82,29 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
       <div className="flex flex-col gap-4 px-4">
         <div className="flex flex-col gap-2">
           <h1 className="font-display text-h1 text-ink-900">{listing.title}</h1>
-          <PriceTag amount={listing.price} period={null} className="self-start text-body-strong" />
+          <PriceTag
+            amount={listing.price}
+            period={null}
+            pricePrefix={listing.isService ? "From" : null}
+            className="self-start text-body-strong"
+          />
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="neutral" size="sm">
               {categoryLabel(listing.category)}
             </Badge>
+            {serviceType && (
+              <Badge variant="neutral" size="sm">
+                {serviceType}
+              </Badge>
+            )}
             {condition && (
               <Badge variant="neutral" size="sm">
                 {condition}
+              </Badge>
+            )}
+            {listing.isLeavingSale && (
+              <Badge variant="featured" size="sm">
+                Leaving Sale
               </Badge>
             )}
             {listing.status === "sold" && (
@@ -139,6 +147,16 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
         )}
 
         <SellerInfoCard sellerId={listing.sellerId} />
+
+        {hostelName && (
+          <Link
+            href={`/hostel/${listing.hostelId}`}
+            className="flex items-center gap-2 rounded-md border border-line px-3.5 py-3 text-body-sm text-ink-500"
+          >
+            <Building2 className="size-4 shrink-0 text-brand-800" />
+            Seller is at {hostelName} →
+          </Link>
+        )}
       </div>
 
       <div className="px-4">

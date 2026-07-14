@@ -1,18 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MARKET_CATEGORY_CONFIG, MARKET_CATEGORY_ORDER, MARKET_CONDITION_ORDER, conditionLabel } from "@/lib/market-categories";
+import {
+  MARKET_CATEGORY_CONFIG,
+  MARKET_CATEGORY_ORDER,
+  MARKET_CONDITION_ORDER,
+  SERVICE_TYPE_ORDER,
+  conditionLabel,
+  serviceTypeLabel,
+} from "@/lib/market-categories";
 import { submitMarketListingSchema } from "@/lib/submit-market-listing";
 import { useCreateMarketListing } from "@/hooks/use-create-market-listing";
 import { useUpdateMarketListing } from "@/hooks/use-update-market-listing";
+import { useHostelOptions } from "@/hooks/use-hostel-options";
+import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { cn } from "@/lib/utils";
 import type { UploadedImage } from "@/lib/images";
-import type { MarketCategory, MarketCondition } from "@/lib/supabase/database.types";
+import type { MarketCategory, MarketCondition, MarketServiceType } from "@/lib/supabase/database.types";
 import type { MarketListing } from "@/lib/queries/market";
 
 export type MarketListingFormMode = { kind: "create" } | { kind: "edit"; listingId: string };
@@ -24,12 +33,25 @@ interface MarketListingFormState {
   isFree: boolean;
   category: MarketCategory | null;
   condition: MarketCondition | null;
+  serviceType: MarketServiceType | null;
   images: UploadedImage[];
   contact: string;
+  hostelId: string | null;
 }
 
 function blankState(): MarketListingFormState {
-  return { title: "", description: "", price: "", isFree: false, category: null, condition: null, images: [], contact: "" };
+  return {
+    title: "",
+    description: "",
+    price: "",
+    isFree: false,
+    category: null,
+    condition: null,
+    serviceType: null,
+    images: [],
+    contact: "",
+    hostelId: null,
+  };
 }
 
 function listingToFormState(listing: MarketListing): MarketListingFormState {
@@ -40,8 +62,10 @@ function listingToFormState(listing: MarketListing): MarketListingFormState {
     isFree: listing.price === 0,
     category: listing.category,
     condition: listing.condition,
+    serviceType: listing.serviceType,
     images: listing.images,
     contact: listing.contact,
+    hostelId: listing.hostelId,
   };
 }
 
@@ -61,6 +85,19 @@ export function MarketListingForm({
   const createListing = useCreateMarketListing();
   const updateListing = useUpdateMarketListing();
   const isPending = createListing.isPending || updateListing.isPending;
+  const { data: hostelOptions = [] } = useHostelOptions();
+  const { data: savedHostels } = useSavedHostels();
+
+  // Gentle auto-suggestion, not a forced prompt: if this is a brand new
+  // listing and the seller has exactly one saved hostel, pre-fill the
+  // dropdown with it -- still fully visible and changeable/clearable, so
+  // nothing is being decided on the student's behalf. More than one saved
+  // hostel is ambiguous (which one are they actually at?), so it's left
+  // blank rather than guessing.
+  useEffect(() => {
+    if (mode.kind !== "create" || !savedHostels || savedHostels.length !== 1) return;
+    setForm((prev) => (prev.hostelId ? prev : { ...prev, hostelId: savedHostels[0].hostelId }));
+  }, [mode.kind, savedHostels]);
 
   function set<K extends keyof MarketListingFormState>(key: K, value: MarketListingFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -70,14 +107,18 @@ export function MarketListingForm({
     e.preventDefault();
     setFormError(null);
 
+    const isServiceCategory = form.category === "services";
+
     const result = submitMarketListingSchema.safeParse({
       title: form.title,
       description: form.description.trim() || null,
       price: form.isFree ? 0 : form.price,
       category: form.category,
-      condition: form.category === "services" ? null : form.condition,
+      condition: isServiceCategory ? null : form.condition,
+      serviceType: isServiceCategory ? form.serviceType : null,
       images: form.images,
       contact: form.contact,
+      hostelId: form.hostelId,
     });
 
     if (!result.success) {
@@ -163,7 +204,9 @@ export function MarketListingForm({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-label label text-ink-500">Price (GHS)</span>
+            <span className="text-label label text-ink-500">
+              {form.category === "services" ? "Rate (GHS)" : "Price (GHS)"}
+            </span>
             <button
               type="button"
               onClick={() => set("isFree", !form.isFree)}
@@ -215,7 +258,7 @@ export function MarketListingForm({
         {errors.category && <p className="text-body-sm text-danger">{errors.category}</p>}
       </section>
 
-      {form.category && form.category !== "services" && (
+      {form.category && form.category !== "services" ? (
         <section className="flex flex-col gap-3">
           <span className="text-label label text-ink-500">Condition</span>
           <div className="flex flex-wrap gap-2">
@@ -235,12 +278,35 @@ export function MarketListingForm({
           </div>
           {errors.condition && <p className="text-body-sm text-danger">{errors.condition}</p>}
         </section>
-      )}
+      ) : form.category === "services" ? (
+        <section className="flex flex-col gap-3">
+          <span className="text-label label text-ink-500">Service type (optional)</span>
+          <div className="flex flex-wrap gap-2">
+            {SERVICE_TYPE_ORDER.map((serviceType) => (
+              <button
+                key={serviceType}
+                type="button"
+                onClick={() => set("serviceType", form.serviceType === serviceType ? null : serviceType)}
+                className={cn(
+                  "rounded-pill px-3 py-1.5 text-body-sm font-medium",
+                  form.serviceType === serviceType ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
+                )}
+              >
+                {serviceTypeLabel(serviceType)}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <Textarea
           label="Description (optional)"
-          placeholder="Any details buyers should know?"
+          placeholder={
+            form.category === "services"
+              ? "What do you offer? Include your experience and availability."
+              : "Any details buyers should know?"
+          }
           rows={4}
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
@@ -256,6 +322,28 @@ export function MarketListingForm({
           onChange={(e) => set("contact", e.target.value)}
           error={errors.contact}
         />
+      </section>
+
+      <section className="flex flex-col gap-1.5">
+        <label htmlFor="market-hostel-select" className="text-label label text-ink-500">
+          Which hostel are you at? (optional)
+        </label>
+        <select
+          id="market-hostel-select"
+          value={form.hostelId ?? ""}
+          onChange={(e) => set("hostelId", e.target.value || null)}
+          className="min-h-11 rounded-md border border-line bg-surface px-3.5 text-body text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:border-brand-600"
+        >
+          <option value="">Not linked to a hostel</option>
+          {hostelOptions.map((hostel) => (
+            <option key={hostel.id} value={hostel.id}>
+              {hostel.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-body-sm text-ink-500">
+          Shown to students browsing that hostel&apos;s page — skip this if it doesn&apos;t apply.
+        </p>
       </section>
 
       {formError && <p className="text-body-sm text-danger">{formError}</p>}

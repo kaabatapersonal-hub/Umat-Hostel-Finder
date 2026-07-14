@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { conditionLabel, MARKET_CONDITION_ORDER } from "@/lib/market-categories";
+import { conditionLabel, MARKET_CONDITION_ORDER, SERVICE_TYPE_ORDER, serviceTypeLabel } from "@/lib/market-categories";
 import { DEFAULT_MARKET_FILTERS, type MarketFeedFilters, type MarketSort } from "@/lib/queries/market";
 import type { MarketCondition } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
@@ -104,18 +104,51 @@ export function MarketFiltersSheet({
           </div>
         </div>
 
+        {draft.category === "services" ? (
+          // Condition/price-range don't mean anything for a service --
+          // browsing "Services" filters by what's on offer instead.
+          <div className="flex flex-col gap-2">
+            <span className="text-label label text-ink-500">Service type</span>
+            <div className="flex flex-wrap gap-2">
+              {SERVICE_TYPE_ORDER.map((serviceType) => (
+                <Pill
+                  key={serviceType}
+                  active={draft.serviceType === serviceType}
+                  onClick={() =>
+                    setDraft((prev) => ({ ...prev, serviceType: prev.serviceType === serviceType ? null : serviceType }))
+                  }
+                >
+                  {serviceTypeLabel(serviceType)}
+                </Pill>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <span className="text-label label text-ink-500">Condition</span>
+            <div className="flex flex-wrap gap-2">
+              {MARKET_CONDITION_ORDER.map((condition) => (
+                <Pill
+                  key={condition}
+                  active={draft.condition === condition}
+                  onClick={() => setDraft((prev) => ({ ...prev, condition: prev.condition === condition ? null : (condition as MarketCondition) }))}
+                >
+                  {conditionLabel(condition)}
+                </Pill>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
-          <span className="text-label label text-ink-500">Condition</span>
+          <span className="text-label label text-ink-500">Leaving Campus</span>
           <div className="flex flex-wrap gap-2">
-            {MARKET_CONDITION_ORDER.map((condition) => (
-              <Pill
-                key={condition}
-                active={draft.condition === condition}
-                onClick={() => setDraft((prev) => ({ ...prev, condition: prev.condition === condition ? null : (condition as MarketCondition) }))}
-              >
-                {conditionLabel(condition)}
-              </Pill>
-            ))}
+            <Pill
+              active={!!draft.leavingSaleOnly}
+              onClick={() => setDraft((prev) => ({ ...prev, leavingSaleOnly: !prev.leavingSaleOnly }))}
+            >
+              Leaving Sales only
+            </Pill>
           </div>
         </div>
 

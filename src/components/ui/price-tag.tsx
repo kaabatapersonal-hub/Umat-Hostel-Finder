@@ -11,6 +11,13 @@ export interface PriceTagProps extends React.HTMLAttributes<HTMLSpanElement> {
   // asking price with nothing to divide by.
   period?: string | null;
   currency?: string;
+  // "From" for a service's rate ("From GHS 50") -- a service's price is a
+  // starting rate, not a fixed one-off asking price, so it reads
+  // differently from a physical item's tag even though it's the same pill.
+  // Named pricePrefix, not prefix -- `prefix` collides with a real (if
+  // obscure) global HTML/React attribute already present on
+  // HTMLAttributes<HTMLSpanElement>.
+  pricePrefix?: string | null;
 }
 
 export function PriceTag({
@@ -19,6 +26,7 @@ export function PriceTag({
   max,
   period = "year",
   currency = "GHS",
+  pricePrefix,
   ...props
 }: PriceTagProps) {
   const isRange = max !== undefined && max !== amount;
@@ -33,6 +41,7 @@ export function PriceTag({
       {...props}
     >
       <span className="font-display text-body-strong font-semibold">
+        {pricePrefix && !isFree && `${pricePrefix} `}
         {isFree ? "Free" : `${currency} ${amount.toLocaleString()}`}
         {isRange && ` – ${max.toLocaleString()}`}
       </span>

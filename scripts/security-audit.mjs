@@ -1090,6 +1090,195 @@ async function main() {
   }
 
   // =====================================================================
+  // Marketplace differentiators (Session 20): Leaving Campus Sale,
+  // hostel_id linking, service_type
+  // =====================================================================
+  section("market: differentiators (Session 20)");
+  {
+    // Reset to a known baseline in case a previous interrupted run left
+    // the stranger's leaving-mode flag set.
+    await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: false, p_leaving_date: null });
+
+    const anonToggle = await rpc(null, "set_leaving_campus_mode", { p_enabled: true });
+    check("anon cannot call set_leaving_campus_mode (not granted to anon)", !anonToggle.ok, `status ${anonToggle.status}`);
+
+    const preListing = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Pre-leaving-mode listing", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    const preListingId = preListing.body?.[0]?.id;
+
+    const enableLeaving = await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: true, p_leaving_date: "2026-07-25" });
+    check("set_leaving_campus_mode(true) is callable by a signed-in student", enableLeaving.ok, `status ${enableLeaving.status}`);
+
+    const profileAfterEnable = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=is_leaving_sale,leaving_date`);
+    check(
+      "enabling sets the profile's is_leaving_sale + leaving_date",
+      profileAfterEnable.body?.[0]?.is_leaving_sale === true && profileAfterEnable.body?.[0]?.leaving_date === "2026-07-25",
+      JSON.stringify(profileAfterEnable.body)
+    );
+
+    const preListingAfterEnable = await get(adminToken, `/market_listings?id=eq.${preListingId}&select=is_leaving_sale`);
+    check(
+      "enabling bulk-sets is_leaving_sale on the student's existing active listings",
+      preListingAfterEnable.body?.[0]?.is_leaving_sale === true,
+      JSON.stringify(preListingAfterEnable.body)
+    );
+
+    const spoofNewListing = await post(
+      strangerToken,
+      "/market_listings",
+      {
+        seller_id: strangerUid,
+        title: "[Market Audit] New listing while leaving-mode is on",
+        price: 10,
+        category: "other",
+        contact: "233200000000",
+        is_leaving_sale: false, // attempted spoof -- should be overridden to true
+      },
+      "return=representation"
+    );
+    check(
+      "a new listing auto-inherits is_leaving_sale=true while leaving mode is on (client value ignored)",
+      spoofNewListing.ok && spoofNewListing.body?.[0]?.is_leaving_sale === true,
+      JSON.stringify(spoofNewListing.body)
+    );
+    const postListingId = spoofNewListing.body?.[0]?.id;
+
+    if (hasDistinctOwner) {
+      const ownerListing = await post(
+        ownerToken,
+        "/market_listings",
+        { seller_id: ownerUid, title: "[Market Audit] Unrelated owner listing", price: 10, category: "other", contact: "233200000000" },
+        "return=representation"
+      );
+      const ownerListingId = ownerListing.body?.[0]?.id;
+
+      const strangerTogglesAgain = await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: true, p_leaving_date: null });
+      const ownerListingUnaffected = await get(adminToken, `/market_listings?id=eq.${ownerListingId}&select=is_leaving_sale`);
+      check(
+        "set_leaving_campus_mode only touches the caller's own listings, not another seller's",
+        strangerTogglesAgain.ok && ownerListingUnaffected.body?.[0]?.is_leaving_sale === false,
+        JSON.stringify(ownerListingUnaffected.body)
+      );
+
+      if (ownerListingId) await del(adminToken, `/market_listings?id=eq.${ownerListingId}`);
+    } else {
+      skip("set_leaving_campus_mode only touches the caller's own listings, not another seller's", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const disableLeaving = await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: false, p_leaving_date: null });
+    const profileAfterDisable = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=is_leaving_sale,leaving_date`);
+    const preListingAfterDisable = await get(adminToken, `/market_listings?id=eq.${preListingId}&select=is_leaving_sale`);
+    check(
+      "disabling clears the profile flag/date and bulk-clears is_leaving_sale on existing listings",
+      disableLeaving.ok &&
+        profileAfterDisable.body?.[0]?.is_leaving_sale === false &&
+        profileAfterDisable.body?.[0]?.leaving_date === null &&
+        preListingAfterDisable.body?.[0]?.is_leaving_sale === false,
+      JSON.stringify({ profile: profileAfterDisable.body, listing: preListingAfterDisable.body })
+    );
+
+    const leavingFeedCall = await rpc(null, "get_market_feed", { p_leaving_sale_only: true, p_limit: 20 });
+    check(
+      "get_market_feed p_leaving_sale_only=true only returns leaving-sale listings",
+      leavingFeedCall.ok && (leavingFeedCall.body ?? []).every((row) => row.is_leaving_sale === true),
+      JSON.stringify(leavingFeedCall.body)?.slice(0, 200)
+    );
+
+    const sellerProfileAfter = await rpc(strangerToken, "get_seller_public_profile", { p_seller_id: strangerUid });
+    check(
+      "get_seller_public_profile now also exposes is_leaving_sale/leaving_date",
+      sellerProfileAfter.ok && "is_leaving_sale" in (sellerProfileAfter.body?.[0] ?? {}) && "leaving_date" in (sellerProfileAfter.body?.[0] ?? {}),
+      JSON.stringify(sellerProfileAfter.body)
+    );
+
+    // service_type: CHECK constraint + trigger-forced null off-category.
+    const validService = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Tutoring service", price: 20, category: "services", contact: "233200000000", service_type: "tutoring" },
+      "return=representation"
+    );
+    check(
+      "a valid service_type is stored for a services-category listing",
+      validService.ok && validService.body?.[0]?.service_type === "tutoring",
+      JSON.stringify(validService.body)
+    );
+    const validServiceId = validService.body?.[0]?.id;
+
+    const badServiceType = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "[Market Audit] Bad service_type test",
+      price: 20,
+      category: "services",
+      contact: "233200000000",
+      service_type: "not_a_real_service_type",
+    });
+    check("an invalid service_type is rejected (CHECK constraint)", !badServiceType.ok, `status ${badServiceType.status}`);
+
+    const serviceTypeOffCategory = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] service_type spoof on non-service", price: 20, category: "electronics", contact: "233200000000", service_type: "tutoring" },
+      "return=representation"
+    );
+    check(
+      "service_type is force-nulled when category isn't 'services'",
+      serviceTypeOffCategory.ok && serviceTypeOffCategory.body?.[0]?.service_type === null,
+      JSON.stringify(serviceTypeOffCategory.body)
+    );
+    const serviceTypeOffCategoryId = serviceTypeOffCategory.body?.[0]?.id;
+
+    const serviceTypeFeedCall = await rpc(null, "get_market_feed", { p_category: "services", p_service_type: "tutoring", p_limit: 20 });
+    check(
+      "get_market_feed p_service_type filters to that service type only",
+      serviceTypeFeedCall.ok && (serviceTypeFeedCall.body ?? []).every((row) => row.service_type === "tutoring"),
+      JSON.stringify(serviceTypeFeedCall.body)?.slice(0, 200)
+    );
+
+    // hostel_id: FK constraint against a nonexistent hostel.
+    const fakeHostelId = "00000000-0000-0000-0000-000000000000";
+    const badHostelId = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "[Market Audit] Bad hostel_id test",
+      price: 10,
+      category: "other",
+      contact: "233200000000",
+      hostel_id: fakeHostelId,
+    });
+    check("a nonexistent hostel_id is rejected (FK constraint)", !badHostelId.ok, `status ${badHostelId.status}`);
+
+    const realHostel = await get(null, "/hostels?select=id&limit=1");
+    const realHostelId = realHostel.body?.[0]?.id;
+    if (realHostelId) {
+      const goodHostelId = await post(
+        strangerToken,
+        "/market_listings",
+        { seller_id: strangerUid, title: "[Market Audit] Real hostel_id test", price: 10, category: "other", contact: "233200000000", hostel_id: realHostelId },
+        "return=representation"
+      );
+      check("a real hostel_id is accepted and stored", goodHostelId.ok && goodHostelId.body?.[0]?.hostel_id === realHostelId, JSON.stringify(goodHostelId.body));
+
+      const hostelListingsCall = await get(null, `/market_listings?hostel_id=eq.${realHostelId}&status=eq.active&select=id&limit=10`);
+      check("hostel-linked active listings are anon-readable (hostel page section)", Array.isArray(hostelListingsCall.body), `status ${hostelListingsCall.status}`);
+
+      if (goodHostelId.body?.[0]?.id) await del(adminToken, `/market_listings?id=eq.${goodHostelId.body[0].id}`);
+    } else {
+      skip("a real hostel_id is accepted and stored", "no hostels exist in this database to link against");
+      skip("hostel-linked active listings are anon-readable (hostel page section)", "no hostels exist in this database to link against");
+    }
+
+    // Cleanup.
+    for (const id of [preListingId, postListingId, validServiceId, serviceTypeOffCategoryId]) {
+      if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
+    }
+    await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: false, p_leaving_date: null });
+  }
+
+  // =====================================================================
   // Storage: MIME allow-list, size cap, cross-user write scoping
   // =====================================================================
   section("storage");

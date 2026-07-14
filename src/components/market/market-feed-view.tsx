@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Package, Plus, SlidersHorizontal, Search } from "lucide-react";
+import { AlertCircle, Package, Plus, SlidersHorizontal, Search, PlaneTakeoff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,8 +14,9 @@ import { useMarketFeed } from "@/hooks/use-market-feed";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAuth } from "@/providers/auth-provider";
 import { DEFAULT_MARKET_FILTERS, hasActiveMarketFilters, type MarketFeedFilters } from "@/lib/queries/market";
+import { SERVICE_TYPE_ORDER, serviceTypeLabel } from "@/lib/market-categories";
 import { cn } from "@/lib/utils";
-import type { MarketCategory } from "@/lib/supabase/database.types";
+import type { MarketCategory, MarketServiceType } from "@/lib/supabase/database.types";
 
 export function MarketFeedView() {
   const { requireAuth } = useAuth();
@@ -60,7 +61,14 @@ export function MarketFeedView() {
   const isFiltering = debouncedSearch !== "" || hasActiveMarketFilters(filters);
 
   function setCategory(category: MarketCategory | null) {
-    setFilters((prev) => ({ ...prev, category }));
+    // Service-type only ever applies while browsing Services -- switching
+    // away from that category should drop a stale sub-tag selection
+    // rather than silently keep filtering by it once it's invisible.
+    setFilters((prev) => ({ ...prev, category, serviceType: category === "services" ? prev.serviceType : null }));
+  }
+
+  function setServiceType(serviceType: MarketServiceType | null) {
+    setFilters((prev) => ({ ...prev, serviceType: prev.serviceType === serviceType ? null : serviceType }));
   }
 
   function clearFilters() {
@@ -104,7 +112,41 @@ export function MarketFeedView() {
             </button>
           </div>
 
+          <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            <button
+              type="button"
+              onClick={() => setFilters((prev) => ({ ...prev, leavingSaleOnly: !prev.leavingSaleOnly }))}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-pill px-3 py-1.5 text-body-sm font-medium transition-colors",
+                filters.leavingSaleOnly ? "bg-gold-500 text-ink-900" : "bg-surface text-ink-500 shadow-card hover:bg-surface-muted"
+              )}
+            >
+              <PlaneTakeoff className="size-3.5" />
+              Leaving Sales
+            </button>
+          </div>
+
           <CategoryChips value={filters.category ?? null} onChange={setCategory} />
+
+          {filters.category === "services" && (
+            <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {SERVICE_TYPE_ORDER.map((serviceType) => (
+                <button
+                  key={serviceType}
+                  type="button"
+                  onClick={() => setServiceType(serviceType)}
+                  className={cn(
+                    "shrink-0 rounded-pill px-3 py-1.5 text-body-sm font-medium transition-colors",
+                    filters.serviceType === serviceType
+                      ? "bg-brand-800 text-white"
+                      : "bg-surface text-ink-500 shadow-card hover:bg-surface-muted"
+                  )}
+                >
+                  {serviceTypeLabel(serviceType)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {isPending ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

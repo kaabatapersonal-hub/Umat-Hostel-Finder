@@ -15,6 +15,7 @@ import { FacilitiesGrid } from "./facilities-grid";
 import { RoomTypeBreakdown } from "./room-type-breakdown";
 import { WhatsappGroupBanner } from "./whatsapp-group-banner";
 import { ReviewsSection } from "@/components/reviews/reviews-section";
+import { HostelMarketListingsSection } from "./hostel-market-listings-section";
 import { ContactBar } from "./contact-bar";
 import { DetailsSkeleton } from "./details-skeleton";
 import { RelatedHostelsSidebar } from "./related-hostels-sidebar";
@@ -155,6 +156,8 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
               ratingAvg={hostel.ratingAvg}
               ratingCount={hostel.ratingCount}
             />
+
+            <HostelMarketListingsSection hostelId={hostel.id} hostelName={hostel.name} />
           </motion.div>
         </div>
 

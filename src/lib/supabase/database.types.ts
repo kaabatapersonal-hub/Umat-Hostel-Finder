@@ -16,6 +16,8 @@ export interface Database {
           avatar_url: string | null;
           role: string;
           is_suspended: boolean;
+          is_leaving_sale: boolean;
+          leaving_date: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -26,6 +28,8 @@ export interface Database {
           avatar_url?: string | null;
           role?: string;
           is_suspended?: boolean;
+          is_leaving_sale?: boolean;
+          leaving_date?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -36,6 +40,8 @@ export interface Database {
           avatar_url?: string | null;
           role?: string;
           is_suspended?: boolean;
+          is_leaving_sale?: boolean;
+          leaving_date?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -581,6 +587,7 @@ export interface Database {
           status: string;
           is_leaving_sale: boolean;
           hostel_id: string | null;
+          service_type: string | null;
           views_count: number;
           created_at: string;
           updated_at: string;
@@ -599,6 +606,7 @@ export interface Database {
           status?: string;
           is_leaving_sale?: boolean;
           hostel_id?: string | null;
+          service_type?: string | null;
           views_count?: number;
           created_at?: string;
           updated_at?: string;
@@ -617,6 +625,7 @@ export interface Database {
           status?: string;
           is_leaving_sale?: boolean;
           hostel_id?: string | null;
+          service_type?: string | null;
           views_count?: number;
           created_at?: string;
           updated_at?: string;
@@ -761,6 +770,8 @@ export interface Database {
           p_cursor_price?: number | null;
           p_cursor_id?: string | null;
           p_limit?: number;
+          p_leaving_sale_only?: boolean;
+          p_service_type?: string | null;
         };
         Returns: {
           id: string;
@@ -774,17 +785,27 @@ export interface Database {
           contact: string;
           is_service: boolean;
           is_leaving_sale: boolean;
+          service_type: string | null;
           views_count: number;
           created_at: string;
         }[];
       };
       get_seller_public_profile: {
         Args: { p_seller_id: string };
-        Returns: { full_name: string | null; created_at: string }[];
+        Returns: {
+          full_name: string | null;
+          created_at: string;
+          is_leaving_sale: boolean;
+          leaving_date: string | null;
+        }[];
       };
       toggle_marketplace: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      set_leaving_campus_mode: {
+        Args: { p_enabled: boolean; p_leaving_date?: string | null };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;
@@ -816,3 +837,11 @@ export type MarketCategory =
   | "other";
 export type MarketCondition = "new" | "like_new" | "good" | "fair";
 export type MarketListingStatus = "active" | "sold" | "removed";
+export type MarketServiceType =
+  | "tutoring"
+  | "design"
+  | "programming"
+  | "laundry"
+  | "haircut_barber"
+  | "photography"
+  | "other";

@@ -18,6 +18,7 @@ import { useMyOwnedHostels } from "@/hooks/use-my-owned-hostels";
 import { useMyMarketListings } from "@/hooks/use-my-market-listings";
 import { useSetMarketListingStatus } from "@/hooks/use-set-market-listing-status";
 import { useDeleteMarketListing } from "@/hooks/use-delete-market-listing";
+import { LeavingCampusToggle } from "@/components/market/leaving-campus-toggle";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
 import type { MarketListing } from "@/lib/queries/market";
@@ -272,6 +273,7 @@ export default function ProfilePage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">My Marketplace Listings</h2>
+        <LeavingCampusToggle />
         {marketListingsPending ? (
           <SkeletonRow />
         ) : marketListings.length === 0 ? (

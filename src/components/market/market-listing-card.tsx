@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { SmartImage } from "@/components/ui/smart-image";
 import { PriceTag } from "@/components/ui/price-tag";
 import { Badge } from "@/components/ui/badge";
-import { categoryIcon, conditionLabel } from "@/lib/market-categories";
+import { categoryIcon, conditionLabel, serviceTypeLabel } from "@/lib/market-categories";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { thumbnailSrc } from "@/lib/images";
 import type { MarketListing } from "@/lib/queries/market";
@@ -26,6 +26,7 @@ export interface MarketListingCardProps {
 export function MarketListingCard({ listing, index = 0, animateIn = true }: MarketListingCardProps) {
   const thumbnail = listing.images[0];
   const condition = conditionLabel(listing.condition);
+  const serviceType = serviceTypeLabel(listing.serviceType);
   const isSold = listing.status === "sold";
 
   return (
@@ -35,7 +36,12 @@ export function MarketListingCard({ listing, index = 0, animateIn = true }: Mark
       transition={{ duration: 0.28, delay: Math.min(index, 10) * 0.04, ease: [0.22, 1, 0.36, 1] }}
     >
       <Link href={`/market/${listing.id}`} className="block">
-        <div className="overflow-hidden rounded-lg bg-surface shadow-card">
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg bg-surface shadow-card",
+            listing.isService && "ring-1 ring-inset ring-brand-100"
+          )}
+        >
           <SmartImage
             src={thumbnailSrc(thumbnail)}
             blurDataURL={thumbnail?.blurDataURL}
@@ -43,8 +49,18 @@ export function MarketListingCard({ listing, index = 0, animateIn = true }: Mark
             sizeHint="thumbnail"
             className="aspect-[4/5] w-full"
           >
-            <div className="absolute left-2 top-2">
-              <PriceTag amount={listing.price} period={null} className="text-caption" />
+            <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
+              <PriceTag
+                amount={listing.price}
+                period={null}
+                pricePrefix={listing.isService ? "From" : null}
+                className="text-caption"
+              />
+              {listing.isLeavingSale && (
+                <Badge variant="featured" size="sm">
+                  Leaving Sale
+                </Badge>
+              )}
             </div>
             {isSold && (
               <div className="absolute inset-0 flex items-center justify-center bg-ink-900/50">
@@ -64,6 +80,11 @@ export function MarketListingCard({ listing, index = 0, animateIn = true }: Mark
               {condition && (
                 <Badge variant="neutral" size="sm">
                   {condition}
+                </Badge>
+              )}
+              {serviceType && (
+                <Badge variant="neutral" size="sm">
+                  {serviceType}
                 </Badge>
               )}
             </div>

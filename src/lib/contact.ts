@@ -36,7 +36,13 @@ export function buildHostelInquiryMessage(hostelName: string): string {
   return `Hi, I'm interested in ${hostelName} (via UMaT Hostel Finder)`;
 }
 
-export function buildMarketInquiryMessage(listingTitle: string): string {
+// Services get their own phrasing ("your ... service") rather than the
+// physical-item default -- a tutor or barber isn't "selling" anything, and
+// "interested in buying" would read oddly against a rate-based listing.
+export function buildMarketInquiryMessage(listingTitle: string, isService = false): string {
+  if (isService) {
+    return `Hi, I'm interested in your "${listingTitle}" service on UMaT Hostel Finder`;
+  }
   return `Hi, I'm interested in your listing "${listingTitle}" on UMaT Hostel Finder Marketplace`;
 }
 

@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, MarketCategory, MarketCondition, MarketListingStatus } from "@/lib/supabase/database.types";
+import type {
+  Database,
+  MarketCategory,
+  MarketCondition,
+  MarketListingStatus,
+  MarketServiceType,
+} from "@/lib/supabase/database.types";
 import { parseUploadedImages, type UploadedImage } from "@/lib/images";
 import { deleteImageFromStorage } from "@/lib/storage-upload";
 
@@ -14,8 +20,14 @@ export interface MarketListing {
   images: UploadedImage[];
   contact: string;
   isService: boolean;
+  serviceType: MarketServiceType | null;
   status: MarketListingStatus;
   isLeavingSale: boolean;
+  // Not selected by the feed RPC (get_market_feed doesn't return it) --
+  // always null on feed/related-listing cards, only ever populated for
+  // table-backed reads (LISTING_COLUMNS). Nothing renders it from a card
+  // today, only the listing detail page's reverse hostel link.
+  hostelId: string | null;
   viewsCount: number;
   createdAt: string;
 }
@@ -35,6 +47,7 @@ function mapFeedRow(row: {
   contact: string;
   is_service: boolean;
   is_leaving_sale: boolean;
+  service_type: string | null;
   views_count: number;
   created_at: string;
 }): MarketListing {
@@ -49,8 +62,10 @@ function mapFeedRow(row: {
     images: parseUploadedImages(row.images),
     contact: row.contact,
     isService: row.is_service,
+    serviceType: row.service_type as MarketServiceType | null,
     status: "active",
     isLeavingSale: row.is_leaving_sale,
+    hostelId: null,
     viewsCount: row.views_count,
     createdAt: row.created_at,
   };
@@ -74,6 +89,8 @@ export interface MarketFeedFilters {
   priceMin?: number | null;
   priceMax?: number | null;
   sort?: MarketSort;
+  leavingSaleOnly?: boolean;
+  serviceType?: MarketServiceType | null;
 }
 
 export const DEFAULT_MARKET_FILTERS: MarketFeedFilters = {
@@ -83,6 +100,8 @@ export const DEFAULT_MARKET_FILTERS: MarketFeedFilters = {
   priceMin: null,
   priceMax: null,
   sort: "newest",
+  leavingSaleOnly: false,
+  serviceType: null,
 };
 
 export function hasActiveMarketFilters(filters: MarketFeedFilters): boolean {
@@ -92,7 +111,9 @@ export function hasActiveMarketFilters(filters: MarketFeedFilters): boolean {
     !!filters.freeOnly ||
     filters.priceMin != null ||
     filters.priceMax != null ||
-    (!!filters.sort && filters.sort !== "newest")
+    (!!filters.sort && filters.sort !== "newest") ||
+    !!filters.leavingSaleOnly ||
+    !!filters.serviceType
   );
 }
 
@@ -126,6 +147,8 @@ export async function getMarketFeed(
     p_cursor_price: cursor?.price ?? null,
     p_cursor_id: cursor?.id ?? null,
     p_limit: limit,
+    p_leaving_sale_only: filters.leavingSaleOnly ?? false,
+    p_service_type: filters.serviceType ?? null,
   });
 
   if (error) throw error;
@@ -139,7 +162,7 @@ export async function getMarketFeed(
 }
 
 const LISTING_COLUMNS =
-  "id, seller_id, title, description, price, category, condition, images, contact, is_service, status, is_leaving_sale, views_count, created_at";
+  "id, seller_id, title, description, price, category, condition, images, contact, is_service, service_type, status, is_leaving_sale, hostel_id, views_count, created_at";
 
 interface ListingRow {
   id: string;
@@ -152,8 +175,10 @@ interface ListingRow {
   images: unknown;
   contact: string;
   is_service: boolean;
+  service_type: string | null;
   status: string;
   is_leaving_sale: boolean;
+  hostel_id: string | null;
   views_count: number;
   created_at: string;
 }
@@ -170,8 +195,10 @@ function mapListingRow(row: ListingRow): MarketListing {
     images: parseUploadedImages(row.images),
     contact: row.contact,
     isService: row.is_service,
+    serviceType: row.service_type as MarketServiceType | null,
     status: row.status as MarketListingStatus,
     isLeavingSale: row.is_leaving_sale,
+    hostelId: row.hostel_id,
     viewsCount: row.views_count,
     createdAt: row.created_at,
   };
@@ -306,15 +333,18 @@ export interface CreateMarketListingInput {
   price: number;
   category: MarketCategory;
   condition: MarketCondition | null;
+  serviceType: MarketServiceType | null;
   images: UploadedImage[];
   contact: string;
+  hostelId: string | null;
 }
 
 export async function createMarketListing(
   supabase: SupabaseClient<Database>,
   input: CreateMarketListingInput
 ): Promise<MarketListing> {
-  // is_service is trigger-derived from category server-side -- never sent.
+  // is_service and is_leaving_sale are trigger-derived server-side (from
+  // category and the seller's own profile flag respectively) -- never sent.
   const { data, error } = await supabase
     .from("market_listings")
     .insert({
@@ -324,8 +354,10 @@ export async function createMarketListing(
       price: input.price,
       category: input.category,
       condition: input.condition,
+      service_type: input.serviceType,
       images: input.images as unknown as Database["public"]["Tables"]["market_listings"]["Insert"]["images"],
       contact: input.contact,
+      hostel_id: input.hostelId,
     })
     .select(LISTING_COLUMNS)
     .single();
@@ -341,8 +373,10 @@ export interface UpdateMarketListingInput {
   price: number;
   category: MarketCategory;
   condition: MarketCondition | null;
+  serviceType: MarketServiceType | null;
   images: UploadedImage[];
   contact: string;
+  hostelId: string | null;
 }
 
 export async function updateMarketListing(
@@ -357,8 +391,10 @@ export async function updateMarketListing(
       price: input.price,
       category: input.category,
       condition: input.condition,
+      service_type: input.serviceType,
       images: input.images as unknown as Database["public"]["Tables"]["market_listings"]["Update"]["images"],
       contact: input.contact,
+      hostel_id: input.hostelId,
     })
     .eq("id", input.listingId)
     .select(LISTING_COLUMNS)
@@ -405,6 +441,8 @@ export async function incrementListingViews(supabase: SupabaseClient<Database>, 
 export interface SellerPublicProfile {
   fullName: string | null;
   createdAt: string;
+  isLeavingSale: boolean;
+  leavingDate: string | null;
 }
 
 // Uses get_seller_public_profile rather than a plain profiles select --
@@ -417,7 +455,9 @@ export async function getSellerPublicProfile(
   const { data, error } = await supabase.rpc("get_seller_public_profile", { p_seller_id: sellerId });
   if (error) throw error;
   const row = data?.[0];
-  return row ? { fullName: row.full_name, createdAt: row.created_at } : null;
+  return row
+    ? { fullName: row.full_name, createdAt: row.created_at, isLeavingSale: row.is_leaving_sale, leavingDate: row.leaving_date }
+    : null;
 }
 
 export async function getSellerActiveListingCount(supabase: SupabaseClient<Database>, sellerId: string): Promise<number> {
@@ -428,4 +468,79 @@ export async function getSellerActiveListingCount(supabase: SupabaseClient<Datab
     .eq("status", "active");
   if (error) throw error;
   return count ?? 0;
+}
+
+// Public (no auth required) -- backs /market/seller/[userId], the "Leaving
+// Campus Sale" profile page. market_listings' own SELECT policy is
+// `using (true)`, so this is a plain table read, not an RPC.
+export async function getSellerActiveListings(supabase: SupabaseClient<Database>, sellerId: string): Promise<MarketListing[]> {
+  const { data, error } = await supabase
+    .from("market_listings")
+    .select(LISTING_COLUMNS)
+    .eq("seller_id", sellerId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(mapListingRow);
+}
+
+// Backs the hostel detail page's "Items for sale at [Hostel]" section --
+// same public-read reasoning as getSellerActiveListings. Capped and
+// lightweight (LISTING_COLUMNS, not a join), lazy-loaded via useInView.
+export async function getHostelMarketListings(
+  supabase: SupabaseClient<Database>,
+  hostelId: string,
+  limit = 10
+): Promise<MarketListing[]> {
+  const { data, error } = await supabase
+    .from("market_listings")
+    .select(LISTING_COLUMNS)
+    .eq("hostel_id", hostelId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []).map(mapListingRow);
+}
+
+export interface HostelOption {
+  id: string;
+  name: string;
+}
+
+// Backs the listing form's optional "Which hostel are you at?" dropdown --
+// hostels are already fully public, so this is just id+name, no RPC needed.
+export async function getHostelOptions(supabase: SupabaseClient<Database>): Promise<HostelOption[]> {
+  const { data, error } = await supabase.from("hostels").select("id, name").order("name", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export interface MyLeavingMode {
+  isLeavingSale: boolean;
+  leavingDate: string | null;
+}
+
+export async function getMyLeavingMode(supabase: SupabaseClient<Database>, userId: string): Promise<MyLeavingMode> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("is_leaving_sale, leaving_date")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+  return { isLeavingSale: data.is_leaving_sale, leavingDate: data.leaving_date };
+}
+
+// Bulk-activates/deactivates Leaving Campus mode -- see the migration's own
+// comment on why this is a single RPC (atomicity across profiles +
+// market_listings) rather than two separate client-side updates.
+export async function setLeavingCampusMode(
+  supabase: SupabaseClient<Database>,
+  enabled: boolean,
+  leavingDate: string | null
+): Promise<void> {
+  const { error } = await supabase.rpc("set_leaving_campus_mode", { p_enabled: enabled, p_leaving_date: leavingDate });
+  if (error) throw error;
 }

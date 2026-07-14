@@ -86,6 +86,24 @@ record, and requiring admin pre-approval on every listing would kill the
 - **`app_config` is publicly readable, admin-writable-only.** The client needs to know whether to show the teaser or the real feed, so read access has to be public; write access is gated the same `is_admin()` way as every other admin-only table. Verified a non-admin PATCH to `app_config` is rejected.
 - **`market-images` storage bucket was hardened at creation**, not bolted on after the fact the way Session 15 had to retrofit `hostel-images`/`room-images` — same 10MB cap, same JPEG/PNG/WebP allow-list, applied in the same migration that creates the bucket.
 
+## Session 20: Marketplace Differentiators
+
+Activated the three Session 19 placeholder columns (`is_leaving_sale`,
+`hostel_id`, `is_service`) plus one new one (`service_type`), adding
+Leaving Campus Sale, hostel-linked listings, and a services refinement.
+No new tables, so the adversarial surface is smaller than Session 19's —
+but two of the three features touch write paths that needed the same
+column-vs-row scrutiny as everything before them.
+
+- **Leaving Campus Sale's master switch lives on `profiles`, not on individual listings.** A listing-only flag can't answer "is this seller *currently* in leaving mode?" once listings get created, sold, or deleted over time, and the brief explicitly wants new listings to auto-inherit the mode — a per-listing flag has no way to express that. `profiles.is_leaving_sale`/`leaving_date` is the single source of truth; every new listing inherits it at INSERT time via `protect_market_listing_writes`, and the new `set_leaving_campus_mode` RPC bulk-syncs it onto existing active listings when the student flips the switch.
+- **`set_leaving_campus_mode` is `SECURITY INVOKER`, not `DEFINER` — deliberately, unlike most of this project's other RPCs.** Both underlying UPDATEs (`profiles` where `id = auth.uid()`, `market_listings` where `seller_id = auth.uid()`) only ever touch rows the caller's own existing RLS policies already let them touch directly. There's no privilege gap to bridge here, so running it as invoker means RLS is still fully re-evaluated on every row the RPC touches — it's an atomicity/convenience wrapper (one round trip instead of two separate client-side updates that could partially fail), not a security boundary. Verified with a second distinct identity: a stranger's call only flips their own listings, never another seller's.
+- **A new listing's `is_leaving_sale` is unconditionally trigger-derived from the seller's profile flag at INSERT time, never client-settable** — the same tamper-proofing `is_service` already had. Verified a listing posted with `is_leaving_sale: false` explicitly in the request body still comes back `true` while the seller's leaving mode is active, and vice versa.
+- **`service_type` reuses the exact `is_service` tamper-proofing pattern**: force-nulled by the trigger whenever `category` isn't `'services'`, regardless of what the client sends, and constrained to a fixed seven-value CHECK. Verified a spoofed `service_type` on a non-services listing comes back `null`.
+- **`hostel_id` needed no new RLS at all** — it's just another nullable FK column on an already-public-read, seller-or-admin-write table. The FK constraint itself (not application code) is what stops a listing from pointing at a nonexistent hostel; verified a made-up UUID is rejected at the database level (`23503`).
+- **`get_seller_public_profile` and `get_market_feed` both needed `DROP FUNCTION` + recreate, not `CREATE OR REPLACE`**, since both grew new *output* columns — Postgres allows `CREATE OR REPLACE FUNCTION` to add new *parameters* with defaults (compatible with existing callers), but not to change a table-returning function's result columns. Missing this distinction would have made the migration fail outright rather than silently do the wrong thing, so it surfaced immediately rather than needing to be caught by the audit.
+- **No new abuse surface for suspended accounts** — Leaving Campus mode and hostel-linking both ride on `market_listings`' existing insert/update policies (`not is_suspended()` already applies), so nothing new needed extending there.
+- **The seller sale page (`/market/seller/[userId]`) is fully public by design** — both reads it depends on (`get_seller_public_profile`, `market_listings` select) were already anon-callable from Session 19, since the whole point is a link a student can share to WhatsApp status without asking viewers to sign in first.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:
@@ -95,6 +113,7 @@ Things that are knowingly *not* fixed, and why:
 - **No full Content-Security-Policy.** A CSP tight enough to matter would need careful tuning against Leaflet's inline-styled markers, CARTO tile origins, and Supabase Storage — a broken CSP (blocked map tiles, blocked contact links) is worse for users than none. Basic headers (frame/sniff/referrer) are in place instead. Worth a dedicated pass later, not bundled into this one.
 - **Six audit-script checks are currently skipped**, not failed: they need a *second, genuinely distinct* non-admin identity (a confirmed `SECURITY_AUDIT_OWNER_EMAIL` test account) to prove things like "user A can't read user B's saves." The audit script falls back to using the stranger account as a stand-in owner when that account isn't confirmed yet, which still exercises every RLS policy correctly for owner-vs-admin and anon-vs-authenticated — it just can't prove the narrower two-distinct-strangers cases. Confirm `kaabatapersonal+audit-owner@gmail.com` and re-run for full coverage.
 - **Pentesting, CAPTCHA, DDoS protection beyond Vercel/Supabase platform defaults, and encrypting data that's already public by design** were explicitly out of scope for this session (see the Session 15 brief) — noted here so it isn't mistaken for an oversight.
+- **Session 20's audit extension (`market: differentiators`) hasn't been run against the live database yet** — this local environment doesn't have `SECURITY_AUDIT_ADMIN_EMAIL`/`_PASSWORD` set. `tsc`/`eslint`/`next build` all pass clean and the new checks were reviewed line-by-line against the migration, but run `node scripts/security-audit.mjs` for real before/shortly after this ships, the same as every other session.
 
 ## Manual dashboard actions (not code — do these in Supabase/Vercel/GitHub)
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isValidPhoneNumber } from "@/lib/contact";
-import { MARKET_CATEGORY_ORDER } from "@/lib/market-categories";
-import type { MarketCategory } from "@/lib/supabase/database.types";
+import { MARKET_CATEGORY_ORDER, SERVICE_TYPE_ORDER } from "@/lib/market-categories";
+import type { MarketCategory, MarketServiceType } from "@/lib/supabase/database.types";
 
 const uploadedImageSchema = z.object({
   url: z.string(),
@@ -21,6 +21,7 @@ export const submitMarketListingSchema = z
     price: z.coerce.number({ error: "Enter a price" }).min(0, "Price can't be negative"),
     category: z.enum(MARKET_CATEGORY_ORDER as [MarketCategory, ...MarketCategory[]]),
     condition: z.enum(CONDITION_VALUES).nullable(),
+    serviceType: z.enum(SERVICE_TYPE_ORDER as [MarketServiceType, ...MarketServiceType[]]).nullable(),
     // At least one photo required -- a marketplace listing with no photo
     // is dead on arrival regardless of what the DB itself would allow.
     images: z
@@ -32,6 +33,7 @@ export const submitMarketListingSchema = z
       .trim()
       .min(1, "WhatsApp number is required")
       .refine(isValidPhoneNumber, "Enter a valid phone number, e.g. 024 000 0000"),
+    hostelId: z.string().uuid().nullable(),
   })
   // Condition is meaningless for a service (there's no physical item to
   // grade) -- required for everything else, hidden entirely in the UI
