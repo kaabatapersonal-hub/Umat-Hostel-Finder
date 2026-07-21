@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     }
     const result = await sendEmail({
       to: submitterProfile.email,
-      subject: `Your hostel listing "${submission.name}" is now live on UMaT Hostel Finder`,
+      subject: `Your hostel listing "${submission.name}" is now live on Campa`,
       html: approvalEmailHtml({ hostelName: submission.name, hostelUrl: `${getSiteUrl()}/hostel/${body.hostelId}` }),
     });
     return NextResponse.json(result);

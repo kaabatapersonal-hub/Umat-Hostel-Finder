@@ -19,7 +19,7 @@ import { useMyMarketListings } from "@/hooks/use-my-market-listings";
 import { useSetMarketListingStatus } from "@/hooks/use-set-market-listing-status";
 import { useDeleteMarketListing } from "@/hooks/use-delete-market-listing";
 import { LeavingCampusToggle } from "@/components/market/leaving-campus-toggle";
-import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
 import type { MarketListing } from "@/lib/queries/market";
 
@@ -144,9 +144,12 @@ function MarketListingRow({ listing }: { listing: MarketListing }) {
   );
 }
 
+type ProfileListTab = "saved" | "submissions";
+
 export default function ProfilePage() {
   const { user, profile, loading, requireAuth, signOut } = useAuth();
   const router = useRouter();
+  const [listTab, setListTab] = useState<ProfileListTab>("saved");
   const { data: saved = [], isPending: savedPending } = useSavedHostels();
   const { data: submissions = [], isPending: submissionsPending } = useMySubmissions();
   const { data: ownedHostels = [], isPending: ownedPending } = useMyOwnedHostels();
@@ -179,7 +182,7 @@ export default function ProfilePage() {
           className="mx-4 mt-4 bg-surface shadow-card"
         />
         <Link href="/about" className="mx-4 mt-4 text-center text-body-sm text-ink-500 underline underline-offset-2">
-          About UMaT Hostel Finder
+          About Campa
         </Link>
       </div>
     );
@@ -250,8 +253,47 @@ export default function ProfilePage() {
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-display text-h1 text-ink-900">My Submissions</h2>
-        {submissionsPending ? (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setListTab("saved")}
+            className={cn(
+              "rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
+              listTab === "saved" ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
+            )}
+          >
+            Saved
+          </button>
+          <button
+            type="button"
+            onClick={() => setListTab("submissions")}
+            className={cn(
+              "rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
+              listTab === "submissions" ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
+            )}
+          >
+            Submissions
+          </button>
+        </div>
+
+        {listTab === "saved" ? (
+          savedPending ? (
+            <SkeletonRow />
+          ) : saved.length === 0 ? (
+            <EmptyState
+              icon={<Heart className="size-7" strokeWidth={1.75} />}
+              title="No saved hostels yet"
+              description="Tap the heart on any hostel to keep it here for later."
+              className="bg-surface shadow-card"
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {saved.map((hostel) => (
+                <SavedHostelRow key={hostel.id} saved={hostel} />
+              ))}
+            </div>
+          )
+        ) : submissionsPending ? (
           <div className="flex flex-col gap-2">
             <SkeletonRow />
           </div>
@@ -294,33 +336,13 @@ export default function ProfilePage() {
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-display text-h1 text-ink-900">Saved Hostels</h2>
-        {savedPending ? (
-          <SkeletonRow />
-        ) : saved.length === 0 ? (
-          <EmptyState
-            icon={<Heart className="size-7" strokeWidth={1.75} />}
-            title="No saved hostels yet"
-            description="Tap the heart on any hostel to keep it here for later."
-            className="bg-surface shadow-card"
-          />
-        ) : (
-          <div className="flex flex-col gap-2">
-            {saved.map((hostel) => (
-              <SavedHostelRow key={hostel.id} saved={hostel} />
-            ))}
-          </div>
-        )}
-      </section>
-
       <Button variant="secondary" size="lg" onClick={() => signOut()} className="mt-2">
         <LogOut className="size-4" />
         Sign Out
       </Button>
 
       <Link href="/about" className="text-center text-body-sm text-ink-500 underline underline-offset-2">
-        About UMaT Hostel Finder
+        About Campa
       </Link>
     </div>
   );

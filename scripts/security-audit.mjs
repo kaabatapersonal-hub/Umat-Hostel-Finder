@@ -194,7 +194,7 @@ async function ensureAccount(email, password, label) {
 }
 
 async function main() {
-  console.log("UMaT Hostel Finder -- security audit\n" + "=".repeat(40));
+  console.log("Campa -- security audit\n" + "=".repeat(40));
 
   section("Bootstrap: signing in as all four roles");
   const admin = await authSignIn(ADMIN_EMAIL, ADMIN_PASSWORD);

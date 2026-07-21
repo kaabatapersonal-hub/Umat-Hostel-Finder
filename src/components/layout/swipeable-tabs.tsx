@@ -9,7 +9,7 @@ import { triggerHaptic } from "@/lib/haptics";
 // order -- kept as a separate literal rather than importing NAV_ITEMS
 // because this only needs the hrefs, not the icons/labels, and duplicating
 // five strings is cheaper than coupling this to the nav's UI concerns.
-const TAB_ROOTS = ["/", "/map", "/buzz", "/saved", "/profile"];
+const TAB_ROOTS = ["/", "/map", "/buzz", "/market", "/profile"];
 
 // Exact-match only, not startsWith -- /hostel/[id], /buzz/[id], /submit,
 // /kitchen-sink all render through AppShell too, but none of them are tabs,

@@ -28,14 +28,14 @@ const FAQS = [
       "Reviews are signed in, one per student per hostel, and moderated. A review can be reported, and a moderator can remove it if it's unfair, fake, or breaks the rules.",
   },
   {
-    question: "Does UMaT Hostel Finder charge hostel managers?",
+    question: "Does Campa charge hostel managers?",
     answer:
       "Listing your hostel is free. Featured placement at the top of the feed is a paid option for managers who want extra visibility — ask us for details.",
   },
   {
     question: "Is this an official University of Mines and Technology service?",
     answer:
-      "No — UMaT Hostel Finder is an independent project, built by a UMaT student, not operated by the university or the SRC. That may change if a formal partnership happens, and this page will say so clearly if it does.",
+      "No — Campa is an independent project, built by a UMaT student, not operated by the university or the SRC. That may change if a formal partnership happens, and this page will say so clearly if it does.",
   },
 ];
 

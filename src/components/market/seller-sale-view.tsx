@@ -52,7 +52,7 @@ export function SellerSaleView({ sellerId }: { sellerId: string }) {
   const activeListings = listings ?? [];
   const firstContact = activeListings[0]?.contact;
   const whatsappLink = firstContact
-    ? buildWhatsAppLink(firstContact, `Hi, I saw your listings on UMaT Hostel Finder`)
+    ? buildWhatsAppLink(firstContact, `Hi, I saw your listings on Campa`)
     : null;
 
   function handleShare() {

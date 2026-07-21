@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "UMaT Hostel Finder",
-    short_name: "Hostel Finder",
+    name: "Campa",
+    short_name: "Campa",
     description: "Find your next hostel near UMaT — fast, trusted, and built for students.",
     start_url: "/",
     display: "standalone",

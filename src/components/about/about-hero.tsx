@@ -31,7 +31,7 @@ export function AboutHero() {
           </div>
         </div>
 
-        <PhoneFrame src={heroFeed} alt="The UMaT Hostel Finder home feed, showing hostels near campus with prices and availability" priority />
+        <PhoneFrame src={heroFeed} alt="The Campa home feed, showing hostels near campus with prices and availability" priority />
       </div>
     </section>
   );

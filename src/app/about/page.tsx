@@ -14,7 +14,7 @@ import { AboutFooter } from "@/components/about/about-footer";
 // generated and revalidated on this cadence, never rendered per-request.
 export const revalidate = 3600;
 
-const title = "UMaT Hostel Finder — Find student hostels in Tarkwa";
+const title = "Campa — Find student hostels in Tarkwa";
 const description =
   "Browse hostels near UMaT with real photos, prices per room type, live availability, and direct WhatsApp contact with managers. Free for students. Hostel managers list for free too.";
 

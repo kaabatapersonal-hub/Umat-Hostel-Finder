@@ -33,7 +33,7 @@ export function ManagersSection() {
             Own a hostel in Tarkwa? Get it in front of every UMaT student — free.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-body text-white/80">
-            Students check UMaT Hostel Finder before they walk. A listing with real photos and
+            Students check Campa before they walk. A listing with real photos and
             per-room-type prices gets contacted directly on WhatsApp — no commission, no booking
             fee. Listing your hostel is free.
           </p>

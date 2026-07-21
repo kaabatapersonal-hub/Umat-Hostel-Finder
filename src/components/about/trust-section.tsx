@@ -6,7 +6,7 @@ export function TrustSection() {
       <ScrollReveal className="mx-auto flex max-w-2xl flex-col gap-5 text-center">
         <h2 className="font-display text-h1 text-ink-900 sm:text-display">Built by a UMaT student, for UMaT students</h2>
         <p className="text-body text-ink-500">
-          UMaT Hostel Finder started because finding a hostel in Tarkwa meant walking around asking
+          Campa started because finding a hostel in Tarkwa meant walking around asking
           around, guessing distances, and hoping a manager picked up the phone. It uses UMaT&apos;s own
           green and gold, the campus&apos;s own room terms (&ldquo;1 in a room&rdquo;, &ldquo;2 in a room&rdquo;), and real
           walking distances to campus — the kind of detail that only comes from actually being a

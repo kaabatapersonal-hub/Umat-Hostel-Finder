@@ -1,6 +1,7 @@
 # Security
 
-This is the living security record for UMaT Hostel Finder: what was
+This is the living security record for Campa (formerly UMaT Hostel
+Finder): what was
 checked, what was found, what got fixed, what's being knowingly
 accepted, and what's left for a human to do in a dashboard somewhere.
 It's meant to be re-read (and the audit script re-run) before every

@@ -10,7 +10,7 @@ export function AboutFooter() {
     <footer className="bg-brand-900 px-4 py-10 text-white sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-8 sm:flex-row sm:justify-between">
         <div className="flex flex-col gap-2">
-          <span className="font-display text-h2 text-white">UMaT Hostel Finder</span>
+          <span className="font-display text-h2 text-white">Campa</span>
           <p className="max-w-xs text-body-sm text-white/60">
             Find your next hostel near UMaT — real photos, real prices, direct contact with managers.
           </p>
@@ -39,7 +39,7 @@ export function AboutFooter() {
 
       <div className="mx-auto mt-8 flex max-w-5xl flex-col gap-2 border-t border-white/10 pt-6 text-caption text-white/50 sm:flex-row sm:items-center sm:justify-between">
         <span>
-          © {year} UMaT Hostel Finder. Not an official University of Mines and Technology service.
+          © {year} Campa. Not an official University of Mines and Technology service.
         </span>
         <span>
           Built by{" "}

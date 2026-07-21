@@ -23,19 +23,19 @@ const description = "Find your next hostel near UMaT — fast, trusted, and buil
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
-    default: "UMaT Hostel Finder",
-    template: "%s — UMaT Hostel Finder",
+    default: "Campa",
+    template: "%s — Campa",
   },
   description,
   openGraph: {
-    title: "UMaT Hostel Finder",
+    title: "Campa",
     description,
-    siteName: "UMaT Hostel Finder",
+    siteName: "Campa",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "UMaT Hostel Finder",
+    title: "Campa",
     description,
   },
   // Generates both the Apple-specific tag and the generic
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   // screen (no browser chrome) instead of opening back into Safari/Chrome.
   appleWebApp: {
     capable: true,
-    title: "UMaT Hostel Finder",
+    title: "Campa",
     statusBarStyle: "black-translucent",
   },
 };

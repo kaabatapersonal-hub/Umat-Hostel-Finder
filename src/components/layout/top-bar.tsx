@@ -61,7 +61,7 @@ export function TopBar() {
           transition={transition}
           className="font-display text-body-strong text-white"
         >
-          UMaT Hostel Finder
+          Campa
         </motion.span>
       </div>
     </motion.header>

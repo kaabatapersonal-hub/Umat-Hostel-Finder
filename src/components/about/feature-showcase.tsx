@@ -12,7 +12,7 @@ const FEATURES = [
     title: "Real locations, real distances",
     body: "Every pin is a real GPS coordinate, not a guess. See exactly how far a hostel is from campus — on foot — before you spend an afternoon walking around Tarkwa to check.",
     image: featureMap,
-    alt: "The UMaT Hostel Finder map showing a hostel's real location and walking distance to campus",
+    alt: "The Campa map showing a hostel's real location and walking distance to campus",
   },
   {
     title: "Prices for every room type",
@@ -78,7 +78,7 @@ export function FeatureShowcase() {
               <div className="overflow-hidden rounded-lg shadow-card">
                 <Image
                   src={featureSaved}
-                  alt="A shortlist of saved hostels on the Saved tab"
+                  alt="A shortlist of saved hostels"
                   placeholder="blur"
                   sizes="(min-width: 640px) 460px, 90vw"
                 />

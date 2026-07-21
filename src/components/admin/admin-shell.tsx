@@ -36,7 +36,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-h1 text-ink-900">Admin</span>
-            <span className="hidden text-body-sm text-ink-500 sm:inline">UMaT Hostel Finder</span>
+            <span className="hidden text-body-sm text-ink-500 sm:inline">Campa</span>
           </div>
           <Link href="/" className="flex items-center gap-1.5 text-body-sm font-medium text-brand-800">
             <ArrowLeft className="size-4" />

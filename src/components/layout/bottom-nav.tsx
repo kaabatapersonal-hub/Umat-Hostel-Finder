@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { Home, Map, MessageSquare, Heart, User, type LucideIcon } from "lucide-react";
+import { Home, Map, MessageSquare, ShoppingBag, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsKeyboardOpen } from "@/hooks/use-keyboard-inset";
 import { triggerHaptic } from "@/lib/haptics";
@@ -14,11 +14,15 @@ interface NavItem {
   icon: LucideIcon;
 }
 
+// Saved moved into Profile (as a tab alongside Submissions) so Market
+// could get a bottom-nav slot without a 6th tab -- Home/hostels browsing
+// keeps the same icon, just relabeled "Hostels" now that the tab set
+// covers more than just hostels.
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/", label: "Hostels", icon: Home },
   { href: "/map", label: "Map", icon: Map },
   { href: "/buzz", label: "Buzz", icon: MessageSquare },
-  { href: "/saved", label: "Saved", icon: Heart },
+  { href: "/market", label: "Market", icon: ShoppingBag },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

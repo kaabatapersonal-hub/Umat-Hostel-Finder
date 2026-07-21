@@ -33,7 +33,7 @@ export function buildTelLink(rawNumber: string): string {
 }
 
 export function buildHostelInquiryMessage(hostelName: string): string {
-  return `Hi, I'm interested in ${hostelName} (via UMaT Hostel Finder)`;
+  return `Hi, I'm interested in ${hostelName} (via Campa)`;
 }
 
 // Services get their own phrasing ("your ... service") rather than the
@@ -41,9 +41,9 @@ export function buildHostelInquiryMessage(hostelName: string): string {
 // "interested in buying" would read oddly against a rate-based listing.
 export function buildMarketInquiryMessage(listingTitle: string, isService = false): string {
   if (isService) {
-    return `Hi, I'm interested in your "${listingTitle}" service on UMaT Hostel Finder`;
+    return `Hi, I'm interested in your "${listingTitle}" service on Campa`;
   }
-  return `Hi, I'm interested in your listing "${listingTitle}" on UMaT Hostel Finder Marketplace`;
+  return `Hi, I'm interested in your listing "${listingTitle}" on Campa Marketplace`;
 }
 
 // contact/call_number are safe by construction (normalizePhoneNumber
