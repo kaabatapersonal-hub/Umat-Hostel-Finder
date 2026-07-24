@@ -4,7 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { PriceTag, PricePendingPill } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
-import { roomTypeLabel, sortRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
+import { roomTypeVariantLabel, sortRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
 
 // Code-split, same reasoning as the hero gallery's lightbox import -- only
 // paid for once someone actually taps a room photo.
@@ -22,60 +22,65 @@ export interface RoomTypeBreakdownProps {
 export function RoomTypeBreakdown({ roomTypes }: RoomTypeBreakdownProps) {
   // Which room type's gallery is open in the lightbox, and at what photo --
   // one shared viewer instance reused across every room type's grid rather
-  // than one per row.
-  const [active, setActive] = useState<{ type: string; index: number } | null>(null);
+  // than one per row. Tracked by position in `sorted`, not by `type` --
+  // the same base type can now appear more than once (different labels),
+  // so `type` alone can no longer identify a single row.
+  const [active, setActive] = useState<{ roomTypeIndex: number; photoIndex: number } | null>(null);
 
   if (roomTypes.length === 0) return null;
 
   const sorted = sortRoomTypes(roomTypes);
-  const activeRoomType = active ? sorted.find((r) => r.type === active.type) : undefined;
+  const activeRoomType = active ? sorted[active.roomTypeIndex] : undefined;
 
   return (
     <div className="flex flex-col gap-4">
       <h2 className="font-display text-h1 text-ink-900">Room types</h2>
       <div className="flex flex-col gap-4">
-        {sorted.map((roomType) => (
-          <div key={roomType.type} className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-body-strong text-ink-900">{roomTypeLabel(roomType.type)}</span>
-              {roomType.price != null ? (
-                <PriceTag amount={roomType.price} />
-              ) : (
-                <PricePendingPill label="Confirm with manager" />
+        {sorted.map((roomType, roomTypeIndex) => {
+          const variantLabel = roomTypeVariantLabel(roomType.type, roomType.label);
+          return (
+            <div key={`${roomType.type}-${roomType.label ?? ""}-${roomTypeIndex}`} className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-body-strong text-ink-900">{variantLabel}</span>
+                {roomType.price != null ? (
+                  <PriceTag amount={roomType.price} />
+                ) : (
+                  <PricePendingPill label="Confirm with manager" />
+                )}
+              </div>
+
+              {roomType.images.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {roomType.images.map((image, i) => (
+                    <button
+                      key={image.url + i}
+                      type="button"
+                      aria-label={`View ${variantLabel} photo ${i + 1} fullscreen`}
+                      onClick={() => setActive({ roomTypeIndex, photoIndex: i })}
+                      className="appearance-none p-0"
+                    >
+                      <SmartImage
+                        src={image.url}
+                        blurDataURL={image.blurDataURL}
+                        alt={`${variantLabel} photo ${i + 1}`}
+                        sizeHint="medium"
+                        className="aspect-square rounded-md"
+                      />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-
-            {roomType.images.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                {roomType.images.map((image, i) => (
-                  <button
-                    key={image.url + i}
-                    type="button"
-                    aria-label={`View ${roomTypeLabel(roomType.type)} photo ${i + 1} fullscreen`}
-                    onClick={() => setActive({ type: roomType.type, index: i })}
-                    className="appearance-none p-0"
-                  >
-                    <SmartImage
-                      src={image.url}
-                      blurDataURL={image.blurDataURL}
-                      alt={`${roomTypeLabel(roomType.type)} photo ${i + 1}`}
-                      sizeHint="medium"
-                      className="aspect-square rounded-md"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {activeRoomType && (
         <PhotoLightbox
           images={activeRoomType.images}
-          alt={roomTypeLabel(activeRoomType.type)}
+          alt={roomTypeVariantLabel(activeRoomType.type, activeRoomType.label)}
           open={active !== null}
-          startIndex={active?.index ?? 0}
+          startIndex={active?.photoIndex ?? 0}
           onClose={() => setActive(null)}
         />
       )}

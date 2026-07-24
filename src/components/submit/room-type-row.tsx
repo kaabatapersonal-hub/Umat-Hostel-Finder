@@ -10,6 +10,7 @@ import type { UploadedImage } from "@/lib/images";
 export interface RoomTypeDraft {
   key: string;
   type: RoomTypeKey;
+  label: string;
   price: string;
   images: UploadedImage[];
 }
@@ -59,6 +60,13 @@ export function RoomTypeRow({ draft, availableTypes, canRemove, errors, onChange
         )}
       </div>
       {errors?.type && <p className="text-body-sm text-danger">{errors.type}</p>}
+
+      <Input
+        label="Variant label (optional)"
+        placeholder="e.g. New Block, Old Block, No Balcony, Ground Floor"
+        value={draft.label}
+        onChange={(e) => onChange({ ...draft, label: e.target.value })}
+      />
 
       <Input
         label="Price (GHS / year) — optional"

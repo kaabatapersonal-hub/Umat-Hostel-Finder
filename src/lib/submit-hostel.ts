@@ -17,6 +17,16 @@ const MAX_ROOM_TYPE_IMAGES = 3;
 
 const roomTypeFormSchema = z.object({
   type: z.enum(ROOM_TYPE_ORDER as [RoomTypeKey, ...RoomTypeKey[]]),
+  // Optional variant tag ("New Block", "No Balcony", ...) -- lets the same
+  // base `type` appear more than once when it's priced differently by
+  // block/floor/finish. Blank -> null, meaning "the plain variant" (see
+  // the superRefine below for what "duplicate" means once labels exist).
+  label: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .default(null),
   // Optional, not required -- a room type can be added with its price left
   // blank ("confirm with manager" -- see room-type-breakdown.tsx) rather
   // than forcing every price to be known before anything about a partial
@@ -32,9 +42,9 @@ const roomTypeFormSchema = z.object({
 
 // The whole Submit form, validated as one shape at submit time. Room-type
 // duplicate-checking lives here (superRefine) rather than in the UI so the
-// database-shape rule ("one price per occupancy type") is enforced the
-// same way regardless of how a future form (e.g. an edit-listing screen)
-// assembles this object.
+// database-shape rule ("one price per occupancy type + label combo") is
+// enforced the same way regardless of how a future form (e.g. an
+// edit-listing screen) assembles this object.
 export const submitHostelSchema = z
   .object({
     name: z.string().trim().min(2, "Hostel name is required"),
@@ -45,16 +55,23 @@ export const submitHostelSchema = z
       .array(roomTypeFormSchema)
       .min(1, "Add at least one room type")
       .superRefine((types, ctx) => {
-        const seen = new Set<string>();
+        const seen = new Map<string, number>();
         types.forEach((entry, index) => {
-          if (seen.has(entry.type)) {
+          // A duplicate is the same base type *and* the same label (both
+          // blank counts as "the same" -- that's the pre-existing "one
+          // plain entry per type" rule). Different labels on the same
+          // type are the whole point of this feature, not a duplicate.
+          const key = `${entry.type}::${(entry.label ?? "").toLowerCase()}`;
+          if (seen.has(key)) {
             ctx.addIssue({
               code: "custom",
-              message: "Each room type can only be added once",
+              message: entry.label
+                ? "This room type and label combination is already used"
+                : "This room type is already used — add a label (e.g. New Block) to add another variant",
               path: [index, "type"],
             });
           }
-          seen.add(entry.type);
+          seen.set(key, index);
         });
       }),
     images: z.array(uploadedImageSchema).max(MAX_HOSTEL_IMAGES, `Up to ${MAX_HOSTEL_IMAGES} photos`).default([]),

@@ -1,4 +1,4 @@
-import { roomTypeLabel, type RoomTypeEntry } from "@/lib/room-types";
+import { roomTypeVariantLabel, type RoomTypeEntry } from "@/lib/room-types";
 import type { UploadedImage } from "@/lib/images";
 import type { EditableHostelFields } from "@/lib/hostel-fields";
 
@@ -16,7 +16,10 @@ function formatList(values: string[] | undefined): string {
 function formatRoomTypes(entries: RoomTypeEntry[] | undefined): string {
   if (!entries || entries.length === 0) return "(none)";
   return entries
-    .map((entry) => `${roomTypeLabel(entry.type)}: ${entry.price != null ? `GHS ${entry.price.toLocaleString()}` : "price unconfirmed"}`)
+    .map(
+      (entry) =>
+        `${roomTypeVariantLabel(entry.type, entry.label)}: ${entry.price != null ? `GHS ${entry.price.toLocaleString()}` : "price unconfirmed"}`
+    )
     .join("; ");
 }
 

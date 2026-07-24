@@ -55,7 +55,7 @@ export interface SubmitHostelFormProps {
 }
 
 function makeInitialRoomType(): RoomTypeDraft {
-  return { key: `${Date.now()}-${Math.random().toString(36).slice(2)}`, type: ROOM_TYPE_ORDER[0], price: "", images: [] };
+  return { key: `${Date.now()}-${Math.random().toString(36).slice(2)}`, type: ROOM_TYPE_ORDER[0], label: "", price: "", images: [] };
 }
 
 function blankState(overrides?: { location?: string }) {
@@ -89,6 +89,7 @@ function fieldsToFormState(fields: EditableHostelFields): ReturnType<typeof blan
         ? fields.roomTypes.map((rt) => ({
             key: `${rt.type}-${Math.random().toString(36).slice(2)}`,
             type: rt.type,
+            label: rt.label ?? "",
             price: rt.price != null ? String(rt.price) : "",
             images: rt.images,
           }))
@@ -159,7 +160,7 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
       location: form.location,
       distanceText: form.distanceText.trim() || null,
       description: form.description.trim() || null,
-      roomTypes: form.roomTypes.map((r) => ({ type: r.type, price: r.price, images: r.images })),
+      roomTypes: form.roomTypes.map((r) => ({ type: r.type, label: r.label, price: r.price, images: r.images })),
       images: form.images,
       facilities: form.facilities,
       whatsappNumber: form.whatsappNumber,

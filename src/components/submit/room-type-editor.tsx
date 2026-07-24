@@ -14,10 +14,15 @@ export interface RoomTypeEditorProps {
 }
 
 function newDraft(type: RoomTypeKey): RoomTypeDraft {
-  return { key: `${Date.now()}-${Math.random().toString(36).slice(2)}`, type, price: "", images: [] };
+  return { key: `${Date.now()}-${Math.random().toString(36).slice(2)}`, type, label: "", price: "", images: [] };
 }
 
 export function RoomTypeEditor({ value, onChange, errors, formError }: RoomTypeEditorProps) {
+  // The same base type can now appear more than once (with different
+  // labels -- "2 in a room · New Block" vs "2 in a room · Old Block"), so
+  // every type stays pickable in every row; submitHostelSchema's
+  // superRefine is what actually catches a true duplicate (same type +
+  // same/blank label) at submit time.
   const usedTypes = value.map((v) => v.type);
   const unusedTypes = ROOM_TYPE_ORDER.filter((t) => !usedTypes.includes(t));
 
@@ -26,8 +31,11 @@ export function RoomTypeEditor({ value, onChange, errors, formError }: RoomTypeE
   const max = validPrices.length > 0 ? Math.max(...validPrices) : null;
 
   function addRoomType() {
-    if (unusedTypes.length === 0) return;
-    onChange([...value, newDraft(unusedTypes[0])]);
+    // Default a fresh row to a type not already used, purely as a
+    // friendlier starting point (no immediate "already used" error) --
+    // once every type has been used at least once, default back to the
+    // first type; the user can freely change it and add a label.
+    onChange([...value, newDraft(unusedTypes[0] ?? ROOM_TYPE_ORDER[0])]);
   }
 
   function updateRow(index: number, next: RoomTypeDraft) {
@@ -40,30 +48,21 @@ export function RoomTypeEditor({ value, onChange, errors, formError }: RoomTypeE
 
   return (
     <div className="flex flex-col gap-3">
-      {value.map((draft, index) => {
-        const availableTypes = ROOM_TYPE_ORDER.filter((t) => t === draft.type || unusedTypes.includes(t));
-        return (
-          <RoomTypeRow
-            key={draft.key}
-            draft={draft}
-            availableTypes={availableTypes}
-            canRemove={value.length > 1}
-            errors={errors?.[index]}
-            onChange={(next) => updateRow(index, next)}
-            onRemove={() => removeRow(index)}
-          />
-        );
-      })}
+      {value.map((draft, index) => (
+        <RoomTypeRow
+          key={draft.key}
+          draft={draft}
+          availableTypes={ROOM_TYPE_ORDER}
+          canRemove={value.length > 1}
+          errors={errors?.[index]}
+          onChange={(next) => updateRow(index, next)}
+          onRemove={() => removeRow(index)}
+        />
+      ))}
 
       {formError && <p className="text-body-sm text-danger">{formError}</p>}
 
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={addRoomType}
-        disabled={unusedTypes.length === 0}
-        className="self-start"
-      >
+      <Button type="button" variant="secondary" onClick={addRoomType} className="self-start">
         <Plus className="size-4" />
         Add room type
       </Button>
