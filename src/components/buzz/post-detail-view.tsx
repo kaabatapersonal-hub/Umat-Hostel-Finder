@@ -2,17 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, Send } from "lucide-react";
+import { AlertCircle, ArrowLeft, Send, ImagePlay } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BuzzPostCard } from "./buzz-post-card";
 import { ReplyCard } from "./reply-card";
+import { GifPickerSheet } from "./gif-picker-sheet";
 import { useAuth } from "@/providers/auth-provider";
 import { useBuzzPost } from "@/hooks/use-buzz-post";
 import { useBuzzReplies } from "@/hooks/use-buzz-replies";
 import { useCreateBuzzReply } from "@/hooks/use-create-buzz-reply";
 import { useKeyboardInset, useIsKeyboardOpen } from "@/hooks/use-keyboard-inset";
+import type { GifResult } from "@/lib/queries/gifs";
 
 const REPLY_MIN_LENGTH = 2;
 const REPLY_MAX_LENGTH = 300;
@@ -23,6 +25,7 @@ export function PostDetailView({ postId }: { postId: string }) {
   const keyboardInset = useKeyboardInset();
   const isKeyboardOpen = useIsKeyboardOpen();
   const [replyText, setReplyText] = useState("");
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const repliesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: post, isPending, isError, refetch } = useBuzzPost(postId);
@@ -48,6 +51,14 @@ export function PostDetailView({ postId }: { postId: string }) {
     requireAuth(() => {
       createReply.mutate({ postId, content: trimmed }, { onSuccess: () => setReplyText("") });
     });
+  }
+
+  // Sends immediately on pick -- the GIF picker has no separate "send"
+  // step of its own (see gif-picker-sheet.tsx's own comment). No
+  // requireAuth wrapper needed here: the picker can only ever be open for
+  // a signed-in user, since opening it is itself gated below.
+  function handleSelectGif(gif: GifResult) {
+    createReply.mutate({ postId, content: "", gifUrl: gif.fullUrl });
   }
 
   return (
@@ -118,6 +129,14 @@ export function PostDetailView({ postId }: { postId: string }) {
             bottom: isKeyboardOpen ? keyboardInset : "calc(5rem + env(safe-area-inset-bottom))",
           }}
         >
+          <button
+            type="button"
+            aria-label="Send a GIF"
+            onClick={() => requireAuth(() => setGifPickerOpen(true))}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
+          >
+            <ImagePlay className="size-5" />
+          </button>
           <input
             value={replyText}
             onChange={(e) => setReplyText(e.target.value.slice(0, REPLY_MAX_LENGTH))}
@@ -139,6 +158,8 @@ export function PostDetailView({ postId }: { postId: string }) {
           </button>
         </div>
       )}
+
+      <GifPickerSheet open={gifPickerOpen} onClose={() => setGifPickerOpen(false)} onSelect={handleSelectGif} />
     </div>
   );
 }

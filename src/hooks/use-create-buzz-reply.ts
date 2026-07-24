@@ -10,12 +10,12 @@ export function useCreateBuzzReply() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
+    mutationFn: async ({ postId, content, gifUrl }: { postId: string; content: string; gifUrl?: string | null }) => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
-      return createBuzzReply(supabase, { postId, authorId: user.id, content });
+      return createBuzzReply(supabase, { postId, authorId: user.id, content, gifUrl });
     },
     onSuccess: (_reply, { postId }) => {
       queryClient.invalidateQueries({ queryKey: ["buzz-replies", postId] });

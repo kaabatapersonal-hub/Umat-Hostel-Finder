@@ -976,6 +976,68 @@ async function main() {
   }
 
   // =====================================================================
+  // buzz_replies.gif_url (Session 21 Part 2b -- GIF replies via Klipy)
+  // =====================================================================
+  section("buzz: GIF replies (Session 21)");
+  {
+    const gifTestPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] GIF reply test post" },
+      "return=representation"
+    );
+    const gifTestPostId = gifTestPost.body?.[0]?.id;
+
+    const validGifReply = await post(
+      strangerToken,
+      "/buzz_replies",
+      { post_id: gifTestPostId, author_id: strangerUid, content: "", gif_url: "https://media.klipy.com/example.gif" },
+      "return=representation"
+    );
+    check(
+      "a reply with an https gif_url and empty content is accepted",
+      validGifReply.ok && validGifReply.body?.[0]?.gif_url === "https://media.klipy.com/example.gif",
+      JSON.stringify(validGifReply.body)
+    );
+    const gifReplyId = validGifReply.body?.[0]?.id;
+
+    const nonHttpsGif = await post(strangerToken, "/buzz_replies", {
+      post_id: gifTestPostId,
+      author_id: strangerUid,
+      content: "",
+      gif_url: "javascript:alert(1)",
+    });
+    check("a non-https gif_url is rejected (CHECK constraint)", !nonHttpsGif.ok, `status ${nonHttpsGif.status}`);
+
+    const bothTextAndGif = await post(strangerToken, "/buzz_replies", {
+      post_id: gifTestPostId,
+      author_id: strangerUid,
+      content: "text alongside a gif, should fail",
+      gif_url: "https://media.klipy.com/example.gif",
+    });
+    check(
+      "a reply can't have both text content and a gif_url (CHECK constraint)",
+      !bothTextAndGif.ok,
+      `status ${bothTextAndGif.status}`
+    );
+
+    const neitherTextNorGif = await post(strangerToken, "/buzz_replies", {
+      post_id: gifTestPostId,
+      author_id: strangerUid,
+      content: "",
+    });
+    check(
+      "a reply with neither text nor a gif is rejected (CHECK constraint)",
+      !neitherTextNorGif.ok,
+      `status ${neitherTextNorGif.status}`
+    );
+
+    // Cleanup.
+    if (gifReplyId) await del(adminToken, `/buzz_replies?id=eq.${gifReplyId}`);
+    if (gifTestPostId) await del(adminToken, `/buzz_posts?id=eq.${gifTestPostId}`);
+  }
+
+  // =====================================================================
   // market_listings + app_config (Session 19)
   // =====================================================================
   section("market");

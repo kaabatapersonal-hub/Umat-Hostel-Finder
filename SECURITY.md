@@ -128,6 +128,18 @@ treatment as every other public-write Buzz surface:
 - **Removing a reaction is not suspend-gated, adding one is** -- same posture as every other delete-own policy in this app (reviews, buzz posts/replies): cleaning up your own past action isn't the content-spam abuse pattern suspension exists to stop. Verified a suspended account's existing session can't add a reaction.
 - **No admin override on delete.** Unlike posts/replies (which admin can delete for moderation), a reaction has no moderation angle worth a privileged bypass -- only the reactor can remove their own.
 
+## Session 21 Part 2b: GIF replies (Klipy)
+
+Added `buzz_replies.gif_url` and a server-side `/api/gifs` proxy to
+Klipy's search/trending endpoints, backing a GIF picker in the reply
+composer:
+
+- **The Klipy API key never reaches the browser.** Klipy's own API requires the key in the URL path (not a header), which makes it especially important that the client only ever calls this app's own same-origin `/api/gifs` route -- the route reads `KLIPY_API_KEY` from `process.env` server-side and the client never sees Klipy's URL at all, let alone the key embedded in it.
+- **A reply is text *or* a GIF, never both, enforced by a CHECK constraint, not just the compose UI.** Verified directly: a row with both non-empty `content` and a `gif_url` is rejected, and so is a row with neither. A client bypassing the app and hitting `/rest/v1/buzz_replies` directly gets the same rule PostgREST-side that the compose UI already enforces.
+- **`gif_url` is constrained to `https://` CHECK-constraint-side**, defense in depth against a direct API call smuggling a `javascript:`/`data:` URI into a column that gets rendered as an `<img src>`. Lower stakes than an anchor href (a bad `src` just fails to load, it doesn't execute), but cheap enough to close anyway, consistent with this project's posture on `whatsapp_group`/similar free-text-URL columns.
+- **No RLS changes at all** -- GIF replies use the exact same insert/delete policies as text replies (`author_id = auth.uid() and not is_suspended()` / `author_id = auth.uid()`); only the CHECK constraint on the row's shape changed.
+- **A missing `KLIPY_API_KEY` degrades to an empty result set, never an error** -- same "best-effort, never blocks the primary flow" posture as `RESEND_API_KEY`'s absence in `email.ts`. The reply composer still works for plain text either way.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { PostActionsMenu } from "./post-actions-menu";
 import { useAuth } from "@/providers/auth-provider";
@@ -29,7 +30,13 @@ export function ReplyCard({ reply }: { reply: BuzzReply }) {
           <span className="text-body-sm font-medium text-ink-900">{reply.authorName || "Student"}</span>
           <span className="text-caption text-ink-300">{formatRelativeTime(reply.createdAt)}</span>
         </div>
-        <LinkifiedContent content={reply.content} className="text-body-sm" />
+        {reply.gifUrl ? (
+          <div className="relative mt-0.5 aspect-square w-40 max-w-full overflow-hidden rounded-md bg-surface">
+            <Image src={reply.gifUrl} alt="GIF reply" fill unoptimized sizes="160px" className="object-cover" />
+          </div>
+        ) : (
+          <LinkifiedContent content={reply.content} className="text-body-sm" />
+        )}
         {confirmingDelete && (
           <span className="flex items-center gap-2 pt-0.5">
             <button type="button" className="text-caption text-ink-500" onClick={() => setConfirmingDelete(false)}>

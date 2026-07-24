@@ -162,10 +162,14 @@ export interface BuzzReply {
   authorId: string;
   authorName: string | null;
   content: string;
+  // A reply is either text or a GIF, never both -- see the migration's
+  // own comment on why the CHECK constraint enforces this at the
+  // database level too, not just in the compose UI.
+  gifUrl: string | null;
   createdAt: string;
 }
 
-const BUZZ_REPLY_COLUMNS = "id, post_id, author_id, author_name, content, created_at";
+const BUZZ_REPLY_COLUMNS = "id, post_id, author_id, author_name, content, gif_url, created_at";
 
 interface BuzzReplyRow {
   id: string;
@@ -173,6 +177,7 @@ interface BuzzReplyRow {
   author_id: string;
   author_name: string | null;
   content: string;
+  gif_url: string | null;
   created_at: string;
 }
 
@@ -183,6 +188,7 @@ function mapBuzzReply(row: BuzzReplyRow): BuzzReply {
     authorId: row.author_id,
     authorName: row.author_name,
     content: row.content,
+    gifUrl: row.gif_url,
     createdAt: row.created_at,
   };
 }
@@ -219,11 +225,11 @@ export async function getBuzzReplies(
 
 export async function createBuzzReply(
   supabase: SupabaseClient<Database>,
-  { postId, authorId, content }: { postId: string; authorId: string; content: string }
+  { postId, authorId, content, gifUrl }: { postId: string; authorId: string; content: string; gifUrl?: string | null }
 ): Promise<BuzzReply> {
   const { data, error } = await supabase
     .from("buzz_replies")
-    .insert({ post_id: postId, author_id: authorId, content })
+    .insert({ post_id: postId, author_id: authorId, content, gif_url: gifUrl ?? null })
     .select(BUZZ_REPLY_COLUMNS)
     .single();
 
