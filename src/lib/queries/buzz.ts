@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
+// Fixed set, not an open emoji picker -- fast to render, and the CHECK
+// constraint on buzz_reactions.emoji is the real enforcement; this is
+// just the UI's copy of the same 5 values.
+export const BUZZ_REACTION_EMOJIS = ["🔥", "👍", "😂", "💯", "👀"] as const;
+export type BuzzReactionEmoji = (typeof BUZZ_REACTION_EMOJIS)[number];
+
 export interface BuzzPost {
   id: string;
   authorId: string;
@@ -9,11 +15,12 @@ export interface BuzzPost {
   isAdminPost: boolean;
   isPinned: boolean;
   replyCount: number;
+  reactionCounts: Partial<Record<BuzzReactionEmoji, number>>;
   createdAt: string;
 }
 
 const BUZZ_POST_COLUMNS =
-  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, created_at";
+  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, reaction_counts, created_at";
 
 interface BuzzPostRow {
   id: string;
@@ -23,7 +30,18 @@ interface BuzzPostRow {
   is_admin_post: boolean;
   is_pinned: boolean;
   reply_count: number;
+  reaction_counts: unknown;
   created_at: string;
+}
+
+function parseReactionCounts(value: unknown): Partial<Record<BuzzReactionEmoji, number>> {
+  if (!value || typeof value !== "object") return {};
+  const counts: Partial<Record<BuzzReactionEmoji, number>> = {};
+  for (const emoji of BUZZ_REACTION_EMOJIS) {
+    const count = (value as Record<string, unknown>)[emoji];
+    if (typeof count === "number" && count > 0) counts[emoji] = count;
+  }
+  return counts;
 }
 
 function mapBuzzPost(row: BuzzPostRow): BuzzPost {
@@ -35,6 +53,7 @@ function mapBuzzPost(row: BuzzPostRow): BuzzPost {
     isAdminPost: row.is_admin_post,
     isPinned: row.is_pinned,
     replyCount: row.reply_count,
+    reactionCounts: parseReactionCounts(row.reaction_counts),
     createdAt: row.created_at,
   };
 }
@@ -215,4 +234,34 @@ export async function createBuzzReply(
 export async function deleteBuzzReply(supabase: SupabaseClient<Database>, replyId: string): Promise<void> {
   const { error } = await supabase.from("buzz_replies").delete().eq("id", replyId);
   if (error) throw error;
+}
+
+// Adds the reaction if the caller hasn't reacted with this emoji on this
+// post yet, removes it if they have -- one round trip either way. Returns
+// the new state (true = now reacted) for optimistic-UI reconciliation.
+export async function toggleBuzzReaction(
+  supabase: SupabaseClient<Database>,
+  postId: string,
+  emoji: BuzzReactionEmoji
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("toggle_buzz_reaction", { p_post_id: postId, p_emoji: emoji });
+  if (error) throw error;
+  return data;
+}
+
+// The caller's own reactions on one post -- lets the UI highlight which
+// pills are "mine" without needing every other reactor's identity.
+export async function getMyReactionsForPost(
+  supabase: SupabaseClient<Database>,
+  postId: string,
+  userId: string
+): Promise<BuzzReactionEmoji[]> {
+  const { data, error } = await supabase
+    .from("buzz_reactions")
+    .select("emoji")
+    .eq("post_id", postId)
+    .eq("author_id", userId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.emoji as BuzzReactionEmoji);
 }

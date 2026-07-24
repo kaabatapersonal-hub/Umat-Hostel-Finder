@@ -495,6 +495,7 @@ export interface Database {
           is_admin_post: boolean;
           is_pinned: boolean;
           reply_count: number;
+          reaction_counts: Json;
           created_at: string;
           updated_at: string;
         };
@@ -506,6 +507,7 @@ export interface Database {
           is_admin_post?: boolean;
           is_pinned?: boolean;
           reply_count?: number;
+          reaction_counts?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -517,6 +519,7 @@ export interface Database {
           is_admin_post?: boolean;
           is_pinned?: boolean;
           reply_count?: number;
+          reaction_counts?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -565,6 +568,45 @@ export interface Database {
           },
           {
             foreignKeyName: "buzz_replies_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      buzz_reactions: {
+        Row: {
+          id: string;
+          post_id: string;
+          author_id: string;
+          emoji: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          author_id: string;
+          emoji: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          author_id?: string;
+          emoji?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "buzz_reactions_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "buzz_posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "buzz_reactions_author_id_fkey";
             columns: ["author_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -801,6 +843,10 @@ export interface Database {
       };
       toggle_marketplace: {
         Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      toggle_buzz_reaction: {
+        Args: { p_post_id: string; p_emoji: string };
         Returns: boolean;
       };
       set_leaving_campus_mode: {

@@ -880,6 +880,102 @@ async function main() {
   }
 
   // =====================================================================
+  // buzz_reactions (Session 21 Part 2)
+  // =====================================================================
+  section("buzz: reactions (Session 21)");
+  {
+    const reactionPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Reactions test post" },
+      "return=representation"
+    );
+    const reactionPostId = reactionPost.body?.[0]?.id;
+
+    const anonToggle = await rpc(null, "toggle_buzz_reaction", { p_post_id: reactionPostId, p_emoji: "🔥" });
+    check("anon cannot call toggle_buzz_reaction (not granted to anon)", !anonToggle.ok, `status ${anonToggle.status}`);
+
+    const firstToggle = await rpc(strangerToken, "toggle_buzz_reaction", { p_post_id: reactionPostId, p_emoji: "🔥" });
+    check("toggle_buzz_reaction adds a reaction and returns true", firstToggle.ok && firstToggle.body === true, JSON.stringify(firstToggle.body));
+
+    const countsAfterAdd = await get(adminToken, `/buzz_posts?id=eq.${reactionPostId}&select=reaction_counts`);
+    check(
+      "reaction_counts reflects the new reaction",
+      countsAfterAdd.body?.[0]?.reaction_counts?.["🔥"] === 1,
+      JSON.stringify(countsAfterAdd.body)
+    );
+
+    const secondToggle = await rpc(strangerToken, "toggle_buzz_reaction", { p_post_id: reactionPostId, p_emoji: "🔥" });
+    check("toggling the same emoji again removes it and returns false", secondToggle.ok && secondToggle.body === false, JSON.stringify(secondToggle.body));
+
+    const countsAfterRemove = await get(adminToken, `/buzz_posts?id=eq.${reactionPostId}&select=reaction_counts`);
+    check(
+      "reaction_counts drops back to 0/absent after removal",
+      !countsAfterRemove.body?.[0]?.reaction_counts?.["🔥"],
+      JSON.stringify(countsAfterRemove.body)
+    );
+
+    const anonDirectInsert = await post(null, "/buzz_reactions", { post_id: reactionPostId, author_id: strangerUid, emoji: "👍" });
+    check("anon cannot insert a reaction directly", !anonDirectInsert.ok, `status ${anonDirectInsert.status}`);
+
+    const spoofReactionAuthor = await post(strangerToken, "/buzz_reactions", {
+      post_id: reactionPostId,
+      author_id: admin.user.id,
+      emoji: "👍",
+    });
+    check("stranger cannot spoof author_id on a reaction", !spoofReactionAuthor.ok, `status ${spoofReactionAuthor.status}`);
+
+    const badEmoji = await post(strangerToken, "/buzz_reactions", { post_id: reactionPostId, author_id: strangerUid, emoji: "🐸" });
+    check("an emoji outside the fixed set is rejected (CHECK constraint)", !badEmoji.ok, `status ${badEmoji.status}`);
+
+    const realReaction = await post(
+      strangerToken,
+      "/buzz_reactions",
+      { post_id: reactionPostId, author_id: strangerUid, emoji: "👍" },
+      "return=representation"
+    );
+    const duplicateReaction = await post(strangerToken, "/buzz_reactions", {
+      post_id: reactionPostId,
+      author_id: strangerUid,
+      emoji: "👍",
+    });
+    check(
+      "the same user reacting with the same emoji twice is rejected (unique constraint)",
+      realReaction.ok && !duplicateReaction.ok,
+      `status ${duplicateReaction.status}`
+    );
+
+    if (hasDistinctOwner) {
+      const otherDeletesReaction = await del(ownerToken, `/buzz_reactions?post_id=eq.${reactionPostId}&author_id=eq.${strangerUid}&emoji=eq.${encodeURIComponent("👍")}`);
+      const reactionStillExists = await get(adminToken, `/buzz_reactions?post_id=eq.${reactionPostId}&author_id=eq.${strangerUid}&emoji=eq.${encodeURIComponent("👍")}&select=id`);
+      check(
+        "a different user cannot delete someone else's reaction",
+        reactionStillExists.body?.length === 1,
+        JSON.stringify(reactionStillExists.body)
+      );
+    } else {
+      skip("a different user cannot delete someone else's reaction", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    // Suspend enforcement, extended to reactions.
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
+    const suspendedReactionAttempt = await post(strangerToken, "/buzz_reactions", {
+      post_id: reactionPostId,
+      author_id: strangerUid,
+      emoji: "😂",
+    });
+    check(
+      "a suspended account's existing session cannot add a reaction",
+      !suspendedReactionAttempt.ok,
+      `status ${suspendedReactionAttempt.status}`
+    );
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+
+    // Cleanup.
+    if (reactionPostId) await del(adminToken, `/buzz_posts?id=eq.${reactionPostId}`);
+  }
+
+  // =====================================================================
   // market_listings + app_config (Session 19)
   // =====================================================================
   section("market");

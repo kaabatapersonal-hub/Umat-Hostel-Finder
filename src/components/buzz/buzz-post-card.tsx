@@ -7,6 +7,7 @@ import { MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { PostActionsMenu } from "./post-actions-menu";
+import { ReactionPills } from "./reaction-pills";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
 import { useSetBuzzPostPinned } from "@/hooks/use-set-buzz-post-pinned";
@@ -88,6 +89,8 @@ export function BuzzPostCard({ post, index = 0, animateIn = true, linkToDetail =
       {linkToDetail && post.content.length > FEED_TRUNCATION_HINT_LENGTH && (
         <span className="-mt-1.5 text-caption font-medium text-brand-800">Show more</span>
       )}
+
+      <ReactionPills postId={post.id} reactionCounts={post.reactionCounts} />
 
       <div className="flex items-center justify-between pt-1">
         <span className="flex items-center gap-1 text-caption text-ink-500">

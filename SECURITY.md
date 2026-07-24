@@ -105,6 +105,29 @@ column-vs-row scrutiny as everything before them.
 - **No new abuse surface for suspended accounts** — Leaving Campus mode and hostel-linking both ride on `market_listings`' existing insert/update policies (`not is_suspended()` already applies), so nothing new needed extending there.
 - **The seller sale page (`/market/seller/[userId]`) is fully public by design** — both reads it depends on (`get_seller_public_profile`, `market_listings` select) were already anon-callable from Session 19, since the whole point is a link a student can share to WhatsApp status without asking viewers to sign in first.
 
+## Session 21 Part 1: Graceful missing hostel data
+
+Pure display/validation-layer change ahead of launch (feed cards, the
+details page, room-type pricing, the admin Submit form) -- no new
+tables, RPCs, or RLS, so no new adversarial surface either. Noted here
+for completeness, not because anything needed hardening:
+
+- **`RoomTypeEntry.price` became nullable** (`parseRoomTypes` now keeps a room type entry with no confirmed price instead of dropping it) and the Submit form's room-type price field became optional (blank -> `null`) for the same reason -- editing a partially-priced hostel shouldn't require completing every price just to save an unrelated change. The `room_types` jsonb column already had no per-element CHECK constraint, so this needed no migration; it's purely how the client parses and validates a shape the database always allowed.
+- **Nothing here touches a write policy.** A room type with no price, a hostel with no photos/facilities/GPS/contact -- all of these were already writable (or already the default) before this session; only how the *display* layer renders that state changed.
+
+## Session 21 Part 2: Buzz reactions
+
+Added `buzz_reactions` -- a fixed 5-emoji reaction system on Buzz posts,
+denormalized onto `buzz_posts.reaction_counts`. Same adversarial
+treatment as every other public-write Buzz surface:
+
+- **A fixed emoji set, enforced by a CHECK constraint, not just the UI.** The brief calls for exactly 5 emojis (not an open picker) specifically to keep this fast and unabusable -- verified a direct insert with an emoji outside the set (`🐸`) is rejected at the database level, not just hidden from the picker.
+- **`toggle_buzz_reaction` is `SECURITY INVOKER`, not `DEFINER`** -- same reasoning as `set_leaving_campus_mode`: both the insert and delete branches only ever touch rows the caller's own RLS grants (`author_id = auth.uid()`) already let them touch. It's an atomicity/convenience wrapper (one round trip instead of a client-side check-then-act pair, which would otherwise race) not a privilege bridge.
+- **`unique (post_id, author_id, emoji)` stops double-reacting** -- verified a second direct insert of the same (post, author, emoji) triple is rejected, independent of the RPC's own toggle logic (which a client bypassing the RPC and hitting the table directly wouldn't get the benefit of).
+- **`reaction_counts` is trigger-recomputed from `buzz_reactions`**, identical shape to `reply_count` -- never incremented/decremented in place, so it can't drift from the true underlying row count.
+- **Removing a reaction is not suspend-gated, adding one is** -- same posture as every other delete-own policy in this app (reviews, buzz posts/replies): cleaning up your own past action isn't the content-spam abuse pattern suspension exists to stop. Verified a suspended account's existing session can't add a reaction.
+- **No admin override on delete.** Unlike posts/replies (which admin can delete for moderation), a reaction has no moderation angle worth a privileged bypass -- only the reactor can remove their own.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:
