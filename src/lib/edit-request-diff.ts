@@ -15,7 +15,9 @@ function formatList(values: string[] | undefined): string {
 
 function formatRoomTypes(entries: RoomTypeEntry[] | undefined): string {
   if (!entries || entries.length === 0) return "(none)";
-  return entries.map((entry) => `${roomTypeLabel(entry.type)}: GHS ${entry.price.toLocaleString()}`).join("; ");
+  return entries
+    .map((entry) => `${roomTypeLabel(entry.type)}: ${entry.price != null ? `GHS ${entry.price.toLocaleString()}` : "price unconfirmed"}`)
+    .join("; ");
 }
 
 function formatImages(images: UploadedImage[] | undefined): string {

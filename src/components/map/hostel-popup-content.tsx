@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Footprints, Navigation2 } from "lucide-react";
 import { SmartImage } from "@/components/ui/smart-image";
-import { PriceTag } from "@/components/ui/price-tag";
+import { PriceTag, PricePendingPill } from "@/components/ui/price-tag";
 import { Badge } from "@/components/ui/badge";
 import { formatWalkTime, buildDirectionsLink, haversineDistanceKm, type LatLng } from "@/lib/geo";
 import { thumbnailSrc } from "@/lib/images";
@@ -59,8 +59,15 @@ export function HostelPopupContent({ hostel, userPosition, customPoint }: Hostel
             )}
           </div>
 
-          {hostel.priceMin != null && (
-            <PriceTag amount={hostel.priceMin} max={hostel.priceMax ?? undefined} className="w-fit" />
+          {hostel.priceMin != null ? (
+            <PriceTag
+              amount={hostel.priceMin}
+              max={hostel.priceMax ?? undefined}
+              pricePrefix={hostel.priceMin === hostel.priceMax ? "From" : null}
+              className="w-fit"
+            />
+          ) : (
+            <PricePendingPill label="Prices being confirmed" className="w-fit" />
           )}
         </div>
       </Link>

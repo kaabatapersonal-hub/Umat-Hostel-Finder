@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { PriceTag } from "@/components/ui/price-tag";
+import { PriceTag, PricePendingPill } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
 import { roomTypeLabel, sortRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
 
@@ -38,7 +38,11 @@ export function RoomTypeBreakdown({ roomTypes }: RoomTypeBreakdownProps) {
           <div key={roomType.type} className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-3">
               <span className="text-body-strong text-ink-900">{roomTypeLabel(roomType.type)}</span>
-              <PriceTag amount={roomType.price} />
+              {roomType.price != null ? (
+                <PriceTag amount={roomType.price} />
+              ) : (
+                <PricePendingPill label="Confirm with manager" />
+              )}
             </div>
 
             {roomType.images.length > 0 && (

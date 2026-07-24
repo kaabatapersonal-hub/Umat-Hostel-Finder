@@ -49,3 +49,19 @@ export function PriceTag({
     </span>
   );
 }
+
+// Same pill shape as PriceTag, deliberately muted (not gold) -- for a
+// price that isn't confirmed yet rather than one that's free or unknown.
+// Gold means "here's a real number"; this means "ask, don't assume."
+export function PricePendingPill({ label, className }: { label: string; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-baseline gap-1 rounded-pill bg-surface-muted px-3 py-1 text-ink-500",
+        className
+      )}
+    >
+      <span className="text-body-strong font-semibold">{label}</span>
+    </span>
+  );
+}

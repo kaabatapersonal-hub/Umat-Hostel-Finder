@@ -61,11 +61,11 @@ export function RoomTypeRow({ draft, availableTypes, canRemove, errors, onChange
       {errors?.type && <p className="text-body-sm text-danger">{errors.type}</p>}
 
       <Input
-        label="Price (GHS / year)"
+        label="Price (GHS / year) — optional"
         type="number"
         inputMode="decimal"
         min={0}
-        placeholder="e.g. 2500"
+        placeholder="Leave blank if not confirmed yet"
         value={draft.price}
         onChange={(e) => onChange({ ...draft, price: e.target.value })}
         error={errors?.price}

@@ -5,7 +5,14 @@ export interface FacilitiesGridProps {
 }
 
 export function FacilitiesGrid({ facilities }: FacilitiesGridProps) {
-  if (facilities.length === 0) return null;
+  if (facilities.length === 0) {
+    return (
+      <div className="flex flex-col gap-3">
+        <h2 className="font-display text-h1 text-ink-900">Facilities</h2>
+        <p className="text-body-sm text-ink-500">Facilities details coming soon.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">

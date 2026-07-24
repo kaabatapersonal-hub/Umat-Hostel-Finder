@@ -7,7 +7,13 @@ export type RoomTypeKey = "1_in_room" | "2_in_room" | "3_in_room" | "4_in_room" 
 
 export interface RoomTypeEntry {
   type: RoomTypeKey;
-  price: number;
+  // null when this room type's price hasn't been confirmed yet -- the
+  // Submit form always requires a price for a room type it creates, but
+  // partial data seeded directly (bulk import, a quick admin SQL insert
+  // ahead of launch) can legitimately have a room type with no price yet.
+  // Display layers show "Confirm with manager" rather than dropping the
+  // row (see room-type-breakdown.tsx) or a broken "GHS null".
+  price: number | null;
   images: UploadedImage[];
 }
 
@@ -48,8 +54,8 @@ export function parseRoomTypes(value: unknown): RoomTypeEntry[] {
     .map((entry): RoomTypeEntry | null => {
       if (!entry || typeof entry !== "object") return null;
       const type = "type" in entry && typeof entry.type === "string" ? entry.type : null;
+      if (type === null) return null;
       const price = "price" in entry && typeof entry.price === "number" ? entry.price : null;
-      if (type === null || price === null) return null;
 
       return {
         type: type as RoomTypeKey,

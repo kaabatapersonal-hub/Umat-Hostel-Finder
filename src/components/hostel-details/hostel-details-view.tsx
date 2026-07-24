@@ -110,6 +110,7 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
               imageUrl: hostel.images[0]?.url ?? null,
               imageBlur: hostel.images[0]?.blurDataURL ?? null,
             }}
+            whatsappNumber={hostel.contact || null}
           />
 
           <motion.div
@@ -137,10 +138,15 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
               availabilityUpdatedAt={hostel.availabilityUpdatedAt}
             />
 
-            {hostel.description && (
+            {(hostel.description || hostel.roomTypes.length === 0) && (
               <div className="flex flex-col gap-2">
                 <h2 className="font-display text-h1 text-ink-900">About this hostel</h2>
-                <p className="max-w-prose text-body leading-relaxed text-ink-500">{hostel.description}</p>
+                {hostel.description && (
+                  <p className="max-w-prose text-body leading-relaxed text-ink-500">{hostel.description}</p>
+                )}
+                {hostel.roomTypes.length === 0 && (
+                  <p className="text-body-sm text-ink-500">Room details being added — contact manager for availability.</p>
+                )}
               </div>
             )}
 
@@ -168,7 +174,19 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
 
       <RelatedHostelsSection hostelId={hostel.id} location={hostel.location} priceMin={hostel.priceMin} />
 
-      <ContactBar hostelName={hostel.name} whatsappNumber={hostel.contact} callNumber={hostel.callNumber} />
+      {hostel.contact ? (
+        <ContactBar hostelName={hostel.name} whatsappNumber={hostel.contact} callNumber={hostel.callNumber} />
+      ) : (
+        // A broken WhatsApp button (empty number) is worse than no button
+        // at all -- this should be unreachable in practice (contact is
+        // required by the Submit form), but defensive against directly
+        // seeded/imported rows that skipped it.
+        <div className="fixed inset-x-0 z-40 flex justify-center" style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
+          <div className="mx-4 rounded-pill bg-surface px-4 py-2.5 text-body-sm text-ink-500 shadow-md">
+            Manager contact being confirmed — check back soon.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

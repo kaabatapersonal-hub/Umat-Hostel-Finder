@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { PriceTag } from "@/components/ui/price-tag";
+import { PriceTag, PricePendingPill } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
 import { thumbnailSrc } from "@/lib/images";
 import type { HostelCard as HostelCardData } from "@/lib/queries/hostels";
@@ -40,8 +40,15 @@ export function CompactHostelRow({ hostel }: CompactHostelRowProps) {
           <span className="line-clamp-1">{hostel.location}</span>
         </span>
         <div className="mt-0.5 flex items-center gap-1.5">
-          {hostel.priceMin != null && (
-            <PriceTag amount={hostel.priceMin} max={hostel.priceMax ?? undefined} className="text-caption" />
+          {hostel.priceMin != null ? (
+            <PriceTag
+              amount={hostel.priceMin}
+              max={hostel.priceMax ?? undefined}
+              pricePrefix={hostel.priceMin === hostel.priceMax ? "From" : null}
+              className="text-caption"
+            />
+          ) : (
+            <PricePendingPill label="Prices being confirmed" className="text-caption" />
           )}
           <Badge
             variant={hostel.availability === "available" ? "available" : hostel.availability === "full" ? "full" : "filling"}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MapPin, Clock, Star, Navigation2, Map as MapIcon } from "lucide-react";
-import { PriceTag } from "@/components/ui/price-tag";
+import { PriceTag, PricePendingPill } from "@/components/ui/price-tag";
 import { formatWalkTime, buildDirectionsLink } from "@/lib/geo";
 
 export interface HeaderBlockProps {
@@ -34,8 +34,16 @@ export function HeaderBlock({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="font-display text-display text-ink-900">{name}</h1>
-        {priceMin != null && <PriceTag amount={priceMin} max={priceMax ?? undefined} />}
+        {priceMin != null ? (
+          <PriceTag amount={priceMin} max={priceMax ?? undefined} pricePrefix={priceMin === priceMax ? "From" : null} />
+        ) : (
+          <PricePendingPill label="Prices being confirmed" />
+        )}
       </div>
+
+      {priceMin == null && (
+        <p className="text-body-sm text-ink-500">Prices not yet confirmed — tap WhatsApp to ask the manager directly.</p>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 text-body-sm text-ink-500">
         <span className="flex items-center gap-1">
@@ -76,7 +84,7 @@ export function HeaderBlock({
         )}
       </div>
 
-      {latitude != null && longitude != null && (
+      {latitude != null && longitude != null ? (
         <div className="flex flex-wrap items-center gap-4">
           <a
             href={buildDirectionsLink({ lat: latitude, lng: longitude })}
@@ -95,6 +103,11 @@ export function HeaderBlock({
             View on map
           </Link>
         </div>
+      ) : (
+        <span className="flex items-center gap-1 text-body-sm text-ink-500">
+          <MapIcon className="size-3.5 shrink-0" />
+          Map location being added.
+        </span>
       )}
     </div>
   );

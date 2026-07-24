@@ -35,7 +35,7 @@ export function ContactFields({
         value={whatsappNumber}
         onChange={(e) => onWhatsappChange(e.target.value)}
         error={errors?.whatsappNumber}
-        helperText="Students message you here first."
+        helperText="Required — students message you here first."
       />
 
       <label className="flex items-center gap-2 text-body-sm text-ink-500">

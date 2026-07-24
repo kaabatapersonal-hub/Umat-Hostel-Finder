@@ -89,7 +89,7 @@ function fieldsToFormState(fields: EditableHostelFields): ReturnType<typeof blan
         ? fields.roomTypes.map((rt) => ({
             key: `${rt.type}-${Math.random().toString(36).slice(2)}`,
             type: rt.type,
-            price: String(rt.price),
+            price: rt.price != null ? String(rt.price) : "",
             images: rt.images,
           }))
         : [makeInitialRoomType()],
@@ -309,11 +309,24 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
         </div>
       )}
 
+      {(mode.kind === "create" || mode.kind === "admin-create") && (
+        <p className="text-body-sm text-ink-500">
+          Add what you have — you can update later. Only name, area, WhatsApp number, and one room type are required.
+        </p>
+      )}
+
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">Basics</h2>
-        <Input label="Hostel name" value={form.name} onChange={(e) => set("name", e.target.value)} error={errors.name} />
+        <Input
+          label="Hostel name"
+          helperText="Required"
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          error={errors.name}
+        />
         <Input
           label="Location / area"
+          helperText="Required"
           placeholder="e.g. North Campus"
           value={form.location}
           onChange={(e) => set("location", e.target.value)}

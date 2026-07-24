@@ -17,7 +17,16 @@ const MAX_ROOM_TYPE_IMAGES = 3;
 
 const roomTypeFormSchema = z.object({
   type: z.enum(ROOM_TYPE_ORDER as [RoomTypeKey, ...RoomTypeKey[]]),
-  price: z.coerce.number({ error: "Enter a price" }).positive("Price must be greater than 0"),
+  // Optional, not required -- a room type can be added with its price left
+  // blank ("confirm with manager" -- see room-type-breakdown.tsx) rather
+  // than forcing every price to be known before anything about a partial
+  // listing can be saved. Blank -> null; anything else must be a positive
+  // number.
+  price: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) > 0), "Price must be greater than 0")
+    .transform((v) => (v === "" ? null : Number(v))),
   images: z.array(uploadedImageSchema).max(MAX_ROOM_TYPE_IMAGES, `Up to ${MAX_ROOM_TYPE_IMAGES} photos per room type`).default([]),
 });
 

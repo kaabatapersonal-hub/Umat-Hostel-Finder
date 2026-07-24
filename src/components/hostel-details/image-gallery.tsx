@@ -3,10 +3,12 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartImage } from "@/components/ui/smart-image";
+import { HostelPhotoPlaceholder } from "@/components/hostels/hostel-photo-placeholder";
 import { SaveHeartButton } from "@/components/hostels/save-heart-button";
+import { buildWhatsAppLink, buildHostelInquiryMessage } from "@/lib/contact";
 import type { UploadedImage } from "@/lib/images";
 import type { SaveableHostelInput } from "@/lib/queries/saved-hostels";
 
@@ -18,9 +20,13 @@ const PhotoLightbox = dynamic(() => import("./photo-lightbox").then((m) => m.Pho
 export interface ImageGalleryProps {
   images: UploadedImage[];
   hostel: SaveableHostelInput;
+  // Only present when the hostel actually has a contact number on file
+  // (see 1H's "manager contact missing" case) -- lets the no-photos state
+  // make WhatsApp the hero action instead of just a caption.
+  whatsappNumber?: string | null;
 }
 
-export function ImageGallery({ images, hostel }: ImageGalleryProps) {
+export function ImageGallery({ images, hostel, whatsappNumber }: ImageGalleryProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -68,7 +74,22 @@ export function ImageGallery({ images, hostel }: ImageGalleryProps) {
           ))}
         </div>
       ) : (
-        <SmartImage src={null} alt={hostel.name} className="h-full w-full" />
+        <HostelPhotoPlaceholder name={hostel.name} className="h-full w-full">
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-ink-900/70 to-transparent p-4 pt-12 text-center">
+            <span className="text-body-sm text-white/90">Photos coming soon — contact the manager to see the rooms.</span>
+            {whatsappNumber && (
+              <a
+                href={buildWhatsAppLink(whatsappNumber, buildHostelInquiryMessage(hostel.name))}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-11 items-center justify-center gap-2 rounded-pill bg-[#25D366] px-5 text-body-strong font-semibold text-white shadow-md"
+              >
+                <MessageCircle className="size-4" />
+                WhatsApp the manager
+              </a>
+            )}
+          </div>
+        </HostelPhotoPlaceholder>
       )}
 
       <button

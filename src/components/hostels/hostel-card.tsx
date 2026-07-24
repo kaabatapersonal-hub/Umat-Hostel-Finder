@@ -5,8 +5,9 @@ import { motion } from "framer-motion";
 import { MapPin, Clock, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PriceTag } from "@/components/ui/price-tag";
+import { PriceTag, PricePendingPill } from "@/components/ui/price-tag";
 import { SmartImage } from "@/components/ui/smart-image";
+import { HostelPhotoPlaceholder } from "./hostel-photo-placeholder";
 import { SaveHeartButton } from "./save-heart-button";
 import { thumbnailSrc } from "@/lib/images";
 import type { HostelCard as HostelCardData } from "@/lib/queries/hostels";
@@ -34,6 +35,51 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
   const visibleTags = hostel.tags.slice(0, 3);
   const extraTagCount = hostel.tags.length - visibleTags.length;
 
+  // Same overlay (heart, price/badges) regardless of whether a real photo
+  // or the branded placeholder is showing underneath -- see
+  // hostel-photo-placeholder.tsx's own comment on why it accepts children
+  // the same way SmartImage does.
+  const photoOverlay = (
+    <>
+      <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
+        <SaveHeartButton
+          hostel={{
+            id: hostel.id,
+            name: hostel.name,
+            priceMin: hostel.priceMin,
+            priceMax: hostel.priceMax,
+            location: hostel.location,
+            imageUrl: thumbnail?.url ?? null,
+            imageBlur: thumbnail?.blurDataURL ?? null,
+          }}
+        />
+        {hostel.priceMin != null ? (
+          <PriceTag
+            amount={hostel.priceMin}
+            max={hostel.priceMax ?? undefined}
+            pricePrefix={hostel.priceMin === hostel.priceMax ? "From" : null}
+          />
+        ) : (
+          <PricePendingPill label="Prices being confirmed" />
+        )}
+      </div>
+
+      <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
+        {/* Badges float on a photo (or its brand-tinted placeholder) here,
+            unlike everywhere else Badge is used -- a shadow keeps them
+            legible instead of blending into a same-toned thumbnail. */}
+        <Badge variant={availability.variant} size="sm" className="shadow-card">
+          {availability.label}
+        </Badge>
+        {hostel.isActivelyFeatured && (
+          <Badge variant="featured" size="sm" className="shadow-card">
+            Featured
+          </Badge>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <motion.div
       initial={animateIn ? { opacity: 0, y: 8 } : false}
@@ -46,45 +92,21 @@ export function HostelCard({ hostel, index = 0, animateIn = true }: HostelCardPr
             no visible container -- the YouTube grid move -- while every
             overlay (price pill, badges, heart) stays exactly as branded. */}
         <Card interactive className="h-full lg:rounded-md lg:bg-transparent lg:shadow-none">
-          <SmartImage
-            src={thumbnailSrc(thumbnail)}
-            blurDataURL={thumbnail?.blurDataURL}
-            alt={hostel.name}
-            sizeHint="thumbnail"
-            className="aspect-video w-full"
-          >
-            <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
-              <SaveHeartButton
-                hostel={{
-                  id: hostel.id,
-                  name: hostel.name,
-                  priceMin: hostel.priceMin,
-                  priceMax: hostel.priceMax,
-                  location: hostel.location,
-                  imageUrl: thumbnail?.url ?? null,
-                  imageBlur: thumbnail?.blurDataURL ?? null,
-                }}
-              />
-              {hostel.priceMin != null && (
-                <PriceTag amount={hostel.priceMin} max={hostel.priceMax ?? undefined} />
-              )}
-            </div>
-
-            <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
-              {/* Badges float on a photo (or its brand-tinted placeholder)
-                  here, unlike everywhere else Badge is used -- a shadow
-                  keeps them legible instead of blending into a
-                  same-toned thumbnail. */}
-              <Badge variant={availability.variant} size="sm" className="shadow-card">
-                {availability.label}
-              </Badge>
-              {hostel.isActivelyFeatured && (
-                <Badge variant="featured" size="sm" className="shadow-card">
-                  Featured
-                </Badge>
-              )}
-            </div>
-          </SmartImage>
+          {thumbnail ? (
+            <SmartImage
+              src={thumbnailSrc(thumbnail)}
+              blurDataURL={thumbnail.blurDataURL}
+              alt={hostel.name}
+              sizeHint="thumbnail"
+              className="aspect-video w-full"
+            >
+              {photoOverlay}
+            </SmartImage>
+          ) : (
+            <HostelPhotoPlaceholder name={hostel.name} className="aspect-video w-full">
+              {photoOverlay}
+            </HostelPhotoPlaceholder>
+          )}
 
           <div className="flex flex-col gap-2 p-4 lg:px-1 lg:py-3">
             <h3 className="font-display text-h1 text-ink-900 line-clamp-1">{hostel.name}</h3>
