@@ -1,5 +1,23 @@
 import { parseUploadedImages, type UploadedImage } from "./images";
 
+// The hero gallery should show every photo associated with the hostel, not
+// just the general gallery -- a hostel with no general photos but real
+// room-type photos shouldn't show the "no photos yet" placeholder while
+// those photos sit unseen in their own room-type section. General images
+// come first (they're the ones the manager chose to lead with), then each
+// room type's photos in occupancy order, deduped by URL since the same
+// photo occasionally gets attached in both places.
+export function mergeGalleryImages(images: UploadedImage[], roomTypes: RoomTypeEntry[]): UploadedImage[] {
+  const seen = new Set<string>();
+  const merged: UploadedImage[] = [];
+  for (const image of [...images, ...roomTypes.flatMap((roomType) => roomType.images)]) {
+    if (seen.has(image.url)) continue;
+    seen.add(image.url);
+    merged.push(image);
+  }
+  return merged;
+}
+
 // UMaT's own room-type vocabulary. Stored as plain string keys (not a
 // Postgres enum) so the set stays easy to extend — see
 // supabase/migrations/20260702221215_room_types_pricing_facilities_contact.sql.

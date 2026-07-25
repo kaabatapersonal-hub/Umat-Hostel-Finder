@@ -8,6 +8,7 @@ import { useHostel } from "@/hooks/use-hostel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import type { HostelDetails } from "@/lib/queries/hostels";
+import { mergeGalleryImages } from "@/lib/room-types";
 import { ImageGallery } from "./image-gallery";
 import { HeaderBlock } from "./header-block";
 import { AvailabilityBlock } from "./availability-block";
@@ -92,6 +93,12 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
     );
   }
 
+  // The hero gallery shows every photo tied to the hostel, not just the
+  // general gallery -- a hostel with photos only on its room types
+  // shouldn't show the "no photos yet" placeholder while those sit unseen
+  // further down the page.
+  const galleryImages = mergeGalleryImages(hostel.images, hostel.roomTypes);
+
   return (
     <div className="flex flex-col pb-8 lg:pb-12">
       {/* The "watch page" split: main content stays exactly as it's always
@@ -102,15 +109,15 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
       <div className="lg:mx-auto lg:grid lg:max-w-7xl lg:grid-cols-3 lg:gap-8 lg:px-6 lg:pt-6">
         <div className="lg:col-span-2">
           <ImageGallery
-            images={hostel.images}
+            images={galleryImages}
             hostel={{
               id: hostel.id,
               name: hostel.name,
               priceMin: hostel.priceMin,
               priceMax: hostel.priceMax,
               location: hostel.location,
-              imageUrl: hostel.images[0]?.url ?? null,
-              imageBlur: hostel.images[0]?.blurDataURL ?? null,
+              imageUrl: galleryImages[0]?.url ?? null,
+              imageBlur: galleryImages[0]?.blurDataURL ?? null,
             }}
             whatsappNumber={hostel.contact || null}
           />
