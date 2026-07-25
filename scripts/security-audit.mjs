@@ -1736,6 +1736,25 @@ async function main() {
   }
 
   // =====================================================================
+  // Cleanup: the owner's bootstrap test hostel
+  // =====================================================================
+  // This used to be reused indefinitely across runs ("safe to
+  // ignore/delete" was a lie -- nothing ever actually deleted it). That
+  // was harmless while this ran against an empty dev database, but once
+  // real hostels are live, "[Security Audit] Renamed via pending edit" /
+  // "Security Audit Zone" sat in the real public feed between runs,
+  // visible to real users, until caught by inspection. Every child row
+  // (reviews, saved_hostels) FK-cascades on hostel delete, so this is
+  // safe to remove unconditionally now that every section above that
+  // depends on ownerHostelId has already run. The next run just creates
+  // a fresh one.
+  section("Cleanup: the owner's bootstrap test hostel");
+  {
+    const deleteOwnerHostel = await del(adminToken, `/hostels?id=eq.${ownerHostelId}`);
+    check("owner test hostel deleted at the end of the run (no longer left live in the public feed)", deleteOwnerHostel.ok, `status ${deleteOwnerHostel.status}`);
+  }
+
+  // =====================================================================
   // Admin-only API route (email notifications)
   // =====================================================================
   section("api/admin/submission-notify (requires the app's own dev/prod server running)");
