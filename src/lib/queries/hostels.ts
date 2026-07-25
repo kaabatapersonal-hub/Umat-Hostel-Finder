@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
-import { parseRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
+import { parseRoomTypes, mergeGalleryImages, type RoomTypeEntry } from "@/lib/room-types";
 import { parseUploadedImages, type UploadedImage } from "@/lib/images";
 import type { EditableHostelFields } from "@/lib/hostel-fields";
 import { haversineDistanceKm } from "@/lib/geo";
@@ -97,7 +97,11 @@ export async function getHostels(
     priceMax: row.price_max,
     location: row.location,
     distanceText: row.distance_text,
-    images: parseUploadedImages(row.images),
+    // Falls back to a room type's photo when the general gallery is empty --
+    // same reasoning as the details page's hero gallery (mergeGalleryImages)
+    // -- a card shouldn't show the "no photos" placeholder while a real
+    // photo sits unseen in a room type's own section.
+    images: mergeGalleryImages(parseUploadedImages(row.images), parseRoomTypes(row.room_types)),
     tags: row.tags ?? [],
     availability: row.availability,
     ratingAvg: row.rating_avg,
@@ -237,7 +241,7 @@ export async function getRelatedHostels(
   const { data, error } = await supabase
     .from("hostels")
     .select(
-      "id, name, price_min, price_max, location, distance_text, images, tags, availability, rating_avg, rating_count, featured, featured_until, created_at"
+      "id, name, price_min, price_max, location, distance_text, images, room_types, tags, availability, rating_avg, rating_count, featured, featured_until, created_at"
     )
     .neq("id", excludeId)
     .order("created_at", { ascending: false })
@@ -258,7 +262,7 @@ export async function getRelatedHostels(
           priceMax: row.price_max,
           location: row.location,
           distanceText: row.distance_text,
-          images: parseUploadedImages(row.images),
+          images: mergeGalleryImages(parseUploadedImages(row.images), parseRoomTypes(row.room_types)),
           tags: row.tags ?? [],
           availability: row.availability,
           ratingAvg: row.rating_avg,

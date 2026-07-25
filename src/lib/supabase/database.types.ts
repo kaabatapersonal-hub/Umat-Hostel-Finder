@@ -800,6 +800,7 @@ export interface Database {
           location: string;
           distance_text: string | null;
           images: Json;
+          room_types: Json;
           tags: string[];
           availability: string;
           rating_avg: number;

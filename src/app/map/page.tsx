@@ -4,11 +4,10 @@ import { Suspense, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Map as MapIcon, AlertCircle, List, X } from "lucide-react";
+import { Map as MapIcon, List, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { TOP_BAR_HEIGHT_PX } from "@/components/layout/top-bar";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/components/layout/bottom-nav";
-import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChips } from "@/components/hostels/filter-chips";
 import { useMapHostels } from "@/hooks/use-map-hostels";
 import { useHostelFilters } from "@/hooks/use-hostel-filters";
@@ -41,6 +40,21 @@ function MapSkeleton() {
       <div className="flex flex-col items-center gap-2 text-ink-500">
         <MapIcon className="size-6 animate-pulse" strokeWidth={1.5} />
         <span className="text-body-sm">Loading map…</span>
+      </div>
+    </div>
+  );
+}
+
+// A status note floated over the map, never a replacement for it -- the
+// map underneath stays fully interactive (pannable, zoomable) regardless
+// of whether there's anything to say about hostel pins specifically.
+// z-[1000] clears Leaflet's own panes (tiles/markers/popups all sit under
+// 1000 by Leaflet's own convention).
+function MapPinBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-3 top-3 z-[1000] flex justify-center">
+      <div className="pointer-events-auto flex max-w-full items-center gap-2 rounded-md bg-surface px-3.5 py-2.5 text-body-sm text-ink-500 shadow-card">
+        {children}
       </div>
     </div>
   );
@@ -99,43 +113,48 @@ function MapPageContent() {
       <div className="relative mx-4 flex-1 min-h-0 overflow-hidden rounded-lg shadow-card">
         {isPending ? (
           <MapSkeleton />
-        ) : isError ? (
-          <div className="flex h-full w-full items-center justify-center bg-surface-muted px-6">
-            <EmptyState
-              icon={<AlertCircle className="size-7" strokeWidth={1.75} />}
-              title="Couldn't load the map"
-              description="Check your connection and try again."
-              actionLabel="Retry"
-              onAction={() => refetch()}
-            />
-          </div>
-        ) : totalMapped === 0 ? (
-          <div className="flex h-full w-full items-center justify-center bg-surface-muted px-6">
-            <EmptyState
-              icon={<MapIcon className="size-7" strokeWidth={1.75} />}
-              title="Hostel locations coming soon"
-              description="We're plotting real coordinates for every hostel around UMaT."
-            />
-          </div>
-        ) : count === 0 ? (
-          <div className="flex h-full w-full items-center justify-center bg-surface-muted px-6">
-            <EmptyState
-              icon={<MapIcon className="size-7" strokeWidth={1.75} />}
-              title="No hostels match those filters"
-              description="Try clearing a few filters to see more pins."
-              actionLabel="Clear filters"
-              onAction={() => setFilters(DEFAULT_FILTERS)}
-            />
-          </div>
         ) : (
-          <HostelMap
-            hostels={filteredHostels}
-            focusHostelId={focusHostelId}
-            userPosition={userLocation.position}
-            userAccuracy={userLocation.accuracy}
-            userStatus={userLocation.status}
-            onLocate={userLocation.locate}
-          />
+          <>
+            {/* This is a real, general-purpose map of campus and Tarkwa --
+                roads, buildings, landmarks, the works -- with hostel pins
+                as an overlay on top of it. None of the states below
+                (a failed hostel-pin fetch, no hostels with coordinates
+                yet, or a filter excluding all of them) are reasons to
+                take the map itself away; they only mean "zero pins right
+                now," which is a banner on top of a fully working map, not
+                a full-page swap. */}
+            <HostelMap
+              hostels={filteredHostels}
+              focusHostelId={focusHostelId}
+              userPosition={userLocation.position}
+              userAccuracy={userLocation.accuracy}
+              userStatus={userLocation.status}
+              onLocate={userLocation.locate}
+            />
+
+            {isError ? (
+              <MapPinBanner>
+                <span>Couldn&apos;t load hostel pins right now.</span>
+                <button type="button" onClick={() => refetch()} className="font-medium text-brand-800 underline underline-offset-2">
+                  Retry
+                </button>
+              </MapPinBanner>
+            ) : totalMapped === 0 ? (
+              <MapPinBanner>
+                <MapIcon className="size-4 shrink-0" />
+                <span>Hostel pins coming soon — feel free to look around campus and Tarkwa in the meantime.</span>
+              </MapPinBanner>
+            ) : (
+              count === 0 && (
+                <MapPinBanner>
+                  <span>No hostels match those filters</span>
+                  <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="font-medium text-brand-800 underline underline-offset-2">
+                    Clear
+                  </button>
+                </MapPinBanner>
+              )
+            )}
+          </>
         )}
       </div>
     </div>
