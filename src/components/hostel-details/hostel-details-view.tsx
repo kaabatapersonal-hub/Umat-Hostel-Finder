@@ -17,6 +17,7 @@ import { WhatsappGroupBanner } from "./whatsapp-group-banner";
 import { ReviewsSection } from "@/components/reviews/reviews-section";
 import { HostelBuzzTeaser } from "./hostel-buzz-teaser";
 import { HostelMarketListingsSection } from "./hostel-market-listings-section";
+import { HostelActionSheet } from "./hostel-action-sheet";
 import { ContactBar } from "./contact-bar";
 import { DetailsSkeleton } from "./details-skeleton";
 import { RelatedHostelsSidebar } from "./related-hostels-sidebar";
@@ -167,6 +168,8 @@ export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps)
             <HostelBuzzTeaser />
 
             <HostelMarketListingsSection hostelId={hostel.id} hostelName={hostel.name} />
+
+            <HostelActionSheet hostelName={hostel.name} />
           </motion.div>
         </div>
 

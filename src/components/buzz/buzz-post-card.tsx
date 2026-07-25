@@ -6,12 +6,14 @@ import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { PostActionsMenu } from "./post-actions-menu";
 import { ReactionPills } from "./reaction-pills";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
 import { useSetBuzzPostPinned } from "@/hooks/use-set-buzz-post-pinned";
 import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzPost } from "@/lib/queries/buzz";
 
 // Long enough that a genuinely 3-line post rarely trips this, short enough
@@ -29,21 +31,39 @@ export interface BuzzPostCardProps {
   // The detail page renders this same card in-place (full content, more
   // visual weight as "the parent"), not as a link to itself.
   linkToDetail?: boolean;
+  // Resolved by the caller (one batched get_verified_profiles call for
+  // every post on screen) rather than fetched per-card -- see
+  // use-verified-profiles.ts.
+  isAuthorVerified?: boolean;
+  authorVerificationLabel?: string | null;
 }
 
-export function BuzzPostCard({ post, index = 0, animateIn = true, linkToDetail = true }: BuzzPostCardProps) {
+export function BuzzPostCard({
+  post,
+  index = 0,
+  animateIn = true,
+  linkToDetail = true,
+  isAuthorVerified = false,
+  authorVerificationLabel = null,
+}: BuzzPostCardProps) {
   const { user, profile } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deletePost = useDeleteBuzzPost();
   const setPinned = useSetBuzzPostPinned();
 
-  const isAdmin = profile?.role === "admin";
+  // moderate_buzz, not a blanket role === 'admin' check -- a sub-admin
+  // without this permission gets no Pin/Delete-others'-post actions here,
+  // matching what the retrofitted buzz_posts RLS policies now enforce
+  // server-side too (see Session 22 Part 2 in SECURITY.md).
+  const canModerateBuzz = hasAdminPermission(profile, "moderate_buzz");
   const isOwn = !!user && user.id === post.authorId;
-  const canModerate = isOwn || isAdmin;
+  const canModerate = isOwn || canModerateBuzz;
 
   const actions = canModerate
     ? [
-        ...(isAdmin ? [{ label: post.isPinned ? "Unpin" : "Pin", onClick: () => setPinned.mutate({ postId: post.id, pinned: !post.isPinned }) }] : []),
+        ...(canModerateBuzz
+          ? [{ label: post.isPinned ? "Unpin" : "Pin", onClick: () => setPinned.mutate({ postId: post.id, pinned: !post.isPinned }) }]
+          : []),
         { label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) },
       ]
     : [];
@@ -70,6 +90,7 @@ export function BuzzPostCard({ post, index = 0, animateIn = true, linkToDetail =
             <span className={cn("line-clamp-1 text-ink-900", linkToDetail ? "text-body-strong" : "font-display text-h1")}>
               {post.authorName || "Student"}
             </span>
+            {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
             {post.isAdminPost && (
               <Badge variant="available" size="sm">
                 Official

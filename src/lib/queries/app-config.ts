@@ -16,6 +16,19 @@ export async function getAppConfigBoolean(
   return typeof data.value === "boolean" ? data.value : defaultValue;
 }
 
+// Same shape as getAppConfigBoolean, for string-valued config rows
+// (team_whatsapp today).
+export async function getAppConfigString(
+  supabase: SupabaseClient<Database>,
+  key: string,
+  defaultValue: string
+): Promise<string> {
+  const { data, error } = await supabase.from("app_config").select("value").eq("key", key).maybeSingle();
+
+  if (error || !data) return defaultValue;
+  return typeof data.value === "string" ? data.value : defaultValue;
+}
+
 // Admin-only -- the RPC itself re-checks is_admin() server-side regardless
 // of who calls it, this is just the client-side call site. Returns the
 // flag's new value so the caller can reconcile optimistic UI state with

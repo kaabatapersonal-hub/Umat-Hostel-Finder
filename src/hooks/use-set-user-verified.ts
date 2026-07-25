@@ -3,19 +3,19 @@
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { setUserRole } from "@/lib/queries/admin-users";
-import type { ProfileRole, AdminPermission } from "@/lib/supabase/database.types";
+import { setUserVerified } from "@/lib/queries/admin-users";
 
-export function useSetUserRole() {
+export function useSetUserVerified() {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ userId, role, permissions }: { userId: string; role: ProfileRole; permissions?: AdminPermission[] }) =>
-      setUserRole(supabase, userId, role, permissions),
+    mutationFn: ({ userId, verified, label }: { userId: string; verified: boolean; label?: string | null }) =>
+      setUserVerified(supabase, userId, verified, label),
     onSuccess: (_void, { userId }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-user-detail", userId] });
+      queryClient.invalidateQueries({ queryKey: ["verified-profiles"] });
     },
   });
 }

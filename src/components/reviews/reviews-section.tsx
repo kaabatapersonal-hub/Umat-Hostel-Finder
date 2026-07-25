@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { ReviewCard } from "./review-card";
 import { useAuth } from "@/providers/auth-provider";
 import { useMyReview } from "@/hooks/use-my-review";
 import { useReviews } from "@/hooks/use-reviews";
+import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import type { Review } from "@/lib/queries/reviews";
 
 export interface ReviewsSectionProps {
@@ -36,8 +37,15 @@ export function ReviewsSection({ hostelId, hostelOwnerId, ratingAvg, ratingCount
   const reviewsQuery = useReviews(hostelId);
   const [editing, setEditing] = useState(false);
 
-  const allReviews = reviewsQuery.data?.pages.flatMap((page) => page.reviews) ?? [];
+  // Memoized (not recomputed inline) so it's a stable reference for the
+  // authorIds/useVerifiedProfiles dependency chain below -- otherwise a
+  // new array every render would mean a "different" query key every
+  // render too.
+  const allReviews = useMemo(() => reviewsQuery.data?.pages.flatMap((page) => page.reviews) ?? [], [reviewsQuery.data]);
   const visibleReviews = editing ? allReviews.filter((r) => r.id !== myReview?.id) : allReviews;
+
+  const authorIds = useMemo(() => allReviews.map((r) => r.authorId), [allReviews]);
+  const { data: verifiedMap } = useVerifiedProfiles(authorIds);
 
   return (
     <section id="reviews" className="flex scroll-mt-6 flex-col gap-4">
@@ -80,6 +88,8 @@ export function ReviewsSection({ hostelId, hostelOwnerId, ratingAvg, ratingCount
               isOwn={review.authorId === user?.id}
               onEdit={() => setEditing(true)}
               honestBadge={getHonestBadge(review, hostelOwnerId)}
+              isAuthorVerified={verifiedMap?.has(review.authorId) ?? false}
+              authorVerificationLabel={verifiedMap?.get(review.authorId) ?? null}
             />
           ))}
         </div>

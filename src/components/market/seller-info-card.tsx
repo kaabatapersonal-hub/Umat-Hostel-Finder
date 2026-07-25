@@ -3,6 +3,7 @@
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { useSellerInfo } from "@/hooks/use-seller-info";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 
 export function SellerInfoCard({ sellerId }: { sellerId: string }) {
   const { data, isPending } = useSellerInfo(sellerId);
@@ -18,7 +19,10 @@ export function SellerInfoCard({ sellerId }: { sellerId: string }) {
         {getInitials(name, null)}
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="line-clamp-1 text-body-strong text-ink-900">{name}</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="line-clamp-1 text-body-strong text-ink-900">{name}</span>
+          {data?.profile?.isVerified && <VerifiedBadge label={data.profile.verificationLabel} />}
+        </div>
         <span className="text-caption text-ink-500">
           {joinedAt && `Joined ${formatRelativeTime(joinedAt)} · `}
           {data?.activeListingCount ?? 0} active listing{data?.activeListingCount === 1 ? "" : "s"}

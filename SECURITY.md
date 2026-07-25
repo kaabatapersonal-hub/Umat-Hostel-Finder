@@ -140,6 +140,53 @@ composer:
 - **No RLS changes at all** -- GIF replies use the exact same insert/delete policies as text replies (`author_id = auth.uid() and not is_suspended()` / `author_id = auth.uid()`); only the CHECK constraint on the row's shape changed.
 - **A missing `KLIPY_API_KEY` degrades to an empty result set, never an error** -- same "best-effort, never blocks the primary flow" posture as `RESEND_API_KEY`'s absence in `email.ts`. The reply composer still works for plain text either way.
 
+## Session 22 Part 1: Verified users
+
+Added a personal trust badge (`profiles.is_verified`/`verification_label`)
+-- distinct from Buzz's existing "Official" badge, which means "an admin
+wrote this," not "this specific person is verified."
+
+- **A public batch RPC (`get_verified_profiles`), not a denormalized column, and deliberately not the same pattern as `author_name`/`reviewer_name`.** Those are resolved once at insert time because names rarely change; verification is different -- a newly-verified campus influencer's *entire post history* should show the badge immediately, not just posts made after verification. Denormalizing at write time would mean re-badging nothing retroactively. `get_verified_profiles(p_user_ids)` is a small public, anon-callable lookup (same shape as `get_user_activity_counts`, but unauthenticated and returning only `id`/`verification_label` for verified users) -- every feed calls it once for the author ids on screen and merges client-side, never once per row.
+- **`is_verified`/`verification_label` are protected the same way `role` already was** -- extended into `protect_profile_role` rather than a second trigger, gated (at this point in the migration sequence) on `is_admin()`; Part 2 immediately re-gates this to the finer-grained `manage_users` permission once `has_permission()` exists. Verified a non-admin's direct PATCH to their own `is_verified` is silently reverted.
+- **`get_seller_public_profile` (Session 19, already extended twice) grows verification too** -- a listing/seller page is a single-item lookup, simpler to fold in than a second batch call for one id.
+
+## Session 22 Part 2: Admin role permissions (super admin vs sub-admin)
+
+Until this session, `role = 'admin'` was all-or-nothing -- anyone
+promoted could do everything, including promoting others. This adds a
+single super admin (`kaabatapersonal@gmail.com`, bootstrapped by a
+one-time migration `UPDATE`, never settable through the app after that)
+and sub-admins who only get the specific permissions granted to them.
+This was the largest retrofit in the project's history in terms of
+surface area touched, so it got correspondingly careful treatment:
+
+- **Every existing admin-gated RLS policy and RPC was retrofitted to `has_permission('...')`, not left on the old blanket `is_admin()` check.** hostels (insert/update/delete), submissions (update/delete), reviews (the admin branch of update/delete), Buzz posts/replies (the admin branch of update/delete), market_listings (the admin branch of update/delete), `app_config` (insert/update), and the RPCs `apply_pending_changes`/`approve_submission`/`reject_submission`/`toggle_marketplace`/`set_user_suspended`/`get_user_activity_counts`/`delete_user_reviews`/`set_user_verified`. Verified with a real sub-admin session (stranger promoted with *only* `moderate_buzz`): pinning someone else's Buzz post succeeds, and every other permission-gated action (inserting a hostel, approving a submission, bulk-deleting a user's reviews, toggling the marketplace, suspending/verifying another user) is rejected by the database itself, not just hidden by the UI.
+- **`has_permission(p_permission)` treats the super admin as implicitly holding every permission** (`is_super_admin or admin_permissions ? p_permission`) -- there's no separate "does the super admin have X" check anywhere, which would be one more place to keep in sync as permissions get added.
+- **Reads stayed on the broader `is_admin()` check, only writes were tightened.** A sub-admin without `manage_hostels` still needs to load *some* profile/hostel data to render the admin shell/dashboard at all; the brief's own "dashboard shows counts for permitted areas" is a client-side filter (see `admin/page.tsx`'s `STATS` array), not a server-side read restriction. Narrowing reads too was considered and rejected as unnecessary risk for a launch-weekend session -- nothing sensitive leaks through an admin-only read that a sub-admin without the matching write permission couldn't already see via the UI tab they *do* have.
+- **`set_user_role` was extended, not rebuilt** (per the brief's own explicit instruction) -- it now also accepts `p_permissions text[]`, validates every entry against the known permission-key set (an unrecognized key is rejected outright, not silently ignored), and is gated on `is_super_admin()` instead of `is_admin()`. `'manage_admins'` is deliberately never a valid entry in that array and never appears in the promote dialog's checkbox list -- promoting/demoting and setting permissions is exclusively `is_super_admin()`-gated, not something a sub-admin can ever hold "in" their permissions.
+- **The super admin cannot be demoted or suspended by anyone, including themselves** -- the brief's explicit safety net. `protect_profile_role` blocks any `role` change on a row where `is_super_admin = true`, unconditionally (this fires even inside `set_user_role`'s own `SECURITY DEFINER` update, since triggers aren't bypassed by `SECURITY DEFINER` the way RLS policies are); `set_user_suspended` separately rejects targeting the super admin. Verified both directly.
+- **`is_super_admin` itself can never be changed through any write path** -- no RPC, no UI, ever touches it after the one-time bootstrap `UPDATE`; `protect_profile_role` reverts any attempted change unconditionally, verified via a direct PATCH attempt (even from the super admin's own session, targeting someone else's row).
+- **A sub-admin cannot change their own `admin_permissions`** -- same column-vs-row gap this project has hit repeatedly (reviews' `is_resident`, Buzz's `is_pinned`, market's `is_leaving_sale` derivation): `profiles_update_own` RLS would otherwise let any user, including a sub-admin, PATCH their own row's `admin_permissions` directly. `protect_profile_role` closes it the same way as `role`/`is_verified` before it.
+- **`delete_user_reviews` is gated on `moderate_reviews`, not `manage_users`**, despite being exposed from the Users tab's UI -- it deletes review rows, which is what that permission is actually about; the tab it happens to live in is a UI convenience, not the security boundary.
+- **`app_config`'s admin-write policies are gated on `moderate_market`** since its only content today (`marketplace_enabled`, and now `team_whatsapp` -- see Part 3) skews that direction for the flag that actually needs admin-only writes; this mapping is worth revisiting if `app_config` ever grows to hold something unrelated to either marketplace moderation or a publicly-readable-only config value.
+- **Three real bugs the first live audit run caught, fixed in a follow-up migration (`20260724000000_admin_permissions_fixes.sql`) before this session shipped:**
+  1. The original Session 16 `set_user_role(uuid, text)` was left in place alongside the new `set_user_role(uuid, text, text[] default null)` instead of being dropped. PostgREST refuses to guess between two candidate functions when a call could match either via a default parameter, so every existing call site -- which all call with just `p_user_id`/`p_role` -- started failing outright with a "could not choose the best candidate function" error. Promote and demote were silently broken end-to-end (RPC call failed, no row ever changed) until the old overload was dropped.
+  2. `protect_buzz_post_writes`'s `is_pinned` guard and `protect_market_listing_writes`'s `status='removed'` guard were still checking bare `is_admin()`, left over from before permissions existed -- not exploitable by a stranger (RLS already blocks them before the trigger runs), but a sub-admin acting on their *own* post/listing reaches these triggers via the author/seller branch of the RLS policy, so a sub-admin with e.g. only `moderate_reviews` could still pin their own Buzz post or un-remove... reinstate their own removed listing without `moderate_buzz`/`moderate_market`. Both triggers now call `has_permission()` with the specific permission instead.
+  3. The audit script's own `is_super_admin` direct-PATCH check only accepted the row coming back with `is_super_admin: false`; it didn't account for the (also-correct) case where RLS blocks the PATCH outright and returns zero rows, since admins have no RLS grant to directly PATCH another user's profile row at all -- only through RPCs. Fixed to treat an empty result as equally proof that it can never be set.
+
+  All three found by running `scripts/security-audit.mjs` against the live database immediately after applying the three Session 22 migrations, before anything was committed. Re-ran clean afterward: 159 passed, 0 failed.
+
+## Session 22 Part 3: Hostel page action button
+
+Added a "Something wrong with this listing?" action sheet (report wrong
+info / offer to help / hostel not listed / contact the team) that routes
+to WhatsApp or `/submit` -- explicitly not a new in-app report queue,
+per the brief's own reasoning (a launch-weekend session isn't the time
+to build a moderation queue + notification system for a v1).
+
+- **`app_config.team_whatsapp` is publicly readable** via the table's existing `using (true)` select policy, same as `marketplace_enabled` -- the action sheet needs it client-side to build `wa.me` links, signed in or not, and a phone number that's already handed out on the public `/about` marketing page (`MANAGER_CONTACT_WHATSAPP`) isn't sensitive.
+- **Not admin-editable through the UI this session, by choice, not oversight.** `app_config` writes are gated on `moderate_market` (see Part 2) for the one row that actually needs admin-only writes (`marketplace_enabled`); building a dedicated permission and settings UI just for one contact number was judged not worth it under a launch deadline -- update it via SQL if the number ever changes.
+
 ## Accepted risks
 
 Things that are knowingly *not* fixed, and why:

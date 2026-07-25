@@ -443,6 +443,8 @@ export interface SellerPublicProfile {
   createdAt: string;
   isLeavingSale: boolean;
   leavingDate: string | null;
+  isVerified: boolean;
+  verificationLabel: string | null;
 }
 
 // Uses get_seller_public_profile rather than a plain profiles select --
@@ -456,7 +458,14 @@ export async function getSellerPublicProfile(
   if (error) throw error;
   const row = data?.[0];
   return row
-    ? { fullName: row.full_name, createdAt: row.created_at, isLeavingSale: row.is_leaving_sale, leavingDate: row.leaving_date }
+    ? {
+        fullName: row.full_name,
+        createdAt: row.created_at,
+        isLeavingSale: row.is_leaving_sale,
+        leavingDate: row.leaving_date,
+        isVerified: row.is_verified,
+        verificationLabel: row.verification_label,
+      }
     : null;
 }
 

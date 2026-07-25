@@ -2,6 +2,7 @@
 
 import { Star, Bookmark, FileClock, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import type { AdminUserRow } from "@/lib/queries/admin-users";
 
@@ -18,6 +19,7 @@ export function UserRow({ user, onSelect }: { user: AdminUserRow; onSelect: (id:
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="line-clamp-1 text-body-strong text-ink-900">{user.fullName || "Unnamed"}</span>
+          {user.isVerified && <VerifiedBadge label={user.verificationLabel} />}
           <Badge variant={user.role === "admin" ? "available" : "neutral"} size="sm">
             {user.role === "admin" ? "Admin" : "Student"}
           </Badge>

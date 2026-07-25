@@ -667,6 +667,222 @@ async function main() {
   }
 
   // =====================================================================
+  // Verified users (Session 22 Part 1)
+  // =====================================================================
+  section("verified users (Session 22)");
+  {
+    const anonToggleVerify = await rpc(null, "set_user_verified", { p_user_id: strangerUid, p_verified: true });
+    check("anon cannot call set_user_verified", !anonToggleVerify.ok, `status ${anonToggleVerify.status}`);
+
+    const strangerSelfVerify = await rpc(strangerToken, "set_user_verified", {
+      p_user_id: strangerUid,
+      p_verified: true,
+      p_label: "Fake Badge",
+    });
+    check("a non-admin cannot call set_user_verified", !strangerSelfVerify.ok, JSON.stringify(strangerSelfVerify.body));
+
+    const strangerDirectVerify = await patch(
+      strangerToken,
+      `/profiles?id=eq.${strangerUid}`,
+      { is_verified: true, verification_label: "Self-verified" },
+      "return=representation"
+    );
+    check(
+      "a non-admin cannot set is_verified via direct PATCH (trigger reverts it)",
+      strangerDirectVerify.body?.[0]?.is_verified === false,
+      JSON.stringify(strangerDirectVerify.body)
+    );
+
+    const adminVerifies = await rpc(adminToken, "set_user_verified", {
+      p_user_id: strangerUid,
+      p_verified: true,
+      p_label: "Campus Influencer",
+    });
+    const afterVerify = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=is_verified,verification_label`);
+    check(
+      "admin (manage_users) CAN verify a user with a label",
+      adminVerifies.ok && afterVerify.body?.[0]?.is_verified === true && afterVerify.body?.[0]?.verification_label === "Campus Influencer",
+      JSON.stringify(afterVerify.body)
+    );
+
+    const publicVerifiedLookup = await rpc(null, "get_verified_profiles", { p_user_ids: [strangerUid, admin.user.id] });
+    check(
+      "get_verified_profiles is anon-callable and only returns the verified id",
+      publicVerifiedLookup.ok && publicVerifiedLookup.body?.length === 1 && publicVerifiedLookup.body?.[0]?.id === strangerUid,
+      JSON.stringify(publicVerifiedLookup.body)
+    );
+
+    const sellerProfileVerified = await rpc(null, "get_seller_public_profile", { p_seller_id: strangerUid });
+    check(
+      "get_seller_public_profile now also exposes is_verified/verification_label",
+      sellerProfileVerified.ok && sellerProfileVerified.body?.[0]?.is_verified === true,
+      JSON.stringify(sellerProfileVerified.body)
+    );
+
+    const adminUnverifies = await rpc(adminToken, "set_user_verified", { p_user_id: strangerUid, p_verified: false });
+    const afterUnverify = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=is_verified,verification_label`);
+    check(
+      "admin can remove verification (label clears too)",
+      adminUnverifies.ok && afterUnverify.body?.[0]?.is_verified === false && afterUnverify.body?.[0]?.verification_label === null,
+      JSON.stringify(afterUnverify.body)
+    );
+  }
+
+  // =====================================================================
+  // Admin role permissions (Session 22 Part 2): super admin vs sub-admin
+  // =====================================================================
+  section("admin permissions (Session 22)");
+  {
+    const superAdminCheck = await get(adminToken, `/profiles?id=eq.${admin.user.id}&select=is_super_admin`);
+    check(
+      "the bootstrap admin account is the super admin",
+      superAdminCheck.body?.[0]?.is_super_admin === true,
+      JSON.stringify(superAdminCheck.body)
+    );
+
+    // Give stranger a deliberately narrow sub-admin grant -- moderate_buzz
+    // only -- to exercise every "doesn't have this permission" rejection
+    // with a real signed-in admin session, not just a plain student.
+    const grantSubAdmin = await rpc(adminToken, "set_user_role", {
+      p_user_id: strangerUid,
+      p_role: "admin",
+      p_permissions: ["moderate_buzz"],
+    });
+    const afterGrant = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=role,admin_permissions,is_super_admin`);
+    check(
+      "super admin can promote with a specific permission set",
+      grantSubAdmin.ok &&
+        afterGrant.body?.[0]?.role === "admin" &&
+        JSON.stringify(afterGrant.body?.[0]?.admin_permissions) === JSON.stringify(["moderate_buzz"]),
+      JSON.stringify(afterGrant.body)
+    );
+
+    const subAdminPromotesSelf = await rpc(strangerToken, "set_user_role", {
+      p_user_id: strangerUid,
+      p_role: "admin",
+      p_permissions: ["manage_hostels"],
+    });
+    check("a sub-admin cannot call set_user_role at all (super admin only)", !subAdminPromotesSelf.ok, JSON.stringify(subAdminPromotesSelf.body));
+
+    const subAdminChangesOwnPermissions = await patch(
+      strangerToken,
+      `/profiles?id=eq.${strangerUid}`,
+      { admin_permissions: ["manage_hostels", "manage_users", "moderate_market", "moderate_reviews"] },
+      "return=representation"
+    );
+    check(
+      "a sub-admin cannot change their own admin_permissions via direct PATCH (trigger reverts it)",
+      JSON.stringify(subAdminChangesOwnPermissions.body?.[0]?.admin_permissions) === JSON.stringify(["moderate_buzz"]),
+      JSON.stringify(subAdminChangesOwnPermissions.body)
+    );
+
+    // Has moderate_buzz -- CAN moderate Buzz.
+    const buzzPostForSubAdminTest = await post(
+      adminToken,
+      "/buzz_posts",
+      { author_id: admin.user.id, content: "[Security Audit] Sub-admin permission test post" },
+      "return=representation"
+    );
+    const subAdminTestPostId = buzzPostForSubAdminTest.body?.[0]?.id;
+    const subAdminPinsPost = await patch(strangerToken, `/buzz_posts?id=eq.${subAdminTestPostId}`, { is_pinned: true }, "return=representation");
+    check(
+      "a sub-admin WITH moderate_buzz can pin someone else's post",
+      subAdminPinsPost.body?.[0]?.is_pinned === true,
+      JSON.stringify(subAdminPinsPost.body)
+    );
+
+    // Doesn't have manage_hostels -- CANNOT touch hostels or the
+    // submission review queue.
+    const subAdminInsertsHostel = await post(strangerToken, "/hostels", {
+      name: "[Security Audit] Sub-admin hostel test",
+      location: "x",
+      contact: "233200000000",
+    });
+    check("a sub-admin WITHOUT manage_hostels cannot insert a hostel", !subAdminInsertsHostel.ok, `status ${subAdminInsertsHostel.status}`);
+
+    const subAdminApprovesSubmission = await rpc(strangerToken, "approve_submission", {
+      p_submission_id: "00000000-0000-0000-0000-000000000000",
+    });
+    check(
+      "a sub-admin WITHOUT manage_hostels cannot call approve_submission",
+      !subAdminApprovesSubmission.ok,
+      JSON.stringify(subAdminApprovesSubmission.body)
+    );
+
+    // Doesn't have moderate_reviews -- CANNOT touch reviews as admin.
+    const subAdminDeletesUserReviews = await rpc(strangerToken, "delete_user_reviews", { p_user_id: strangerUid });
+    check(
+      "a sub-admin WITHOUT moderate_reviews cannot call delete_user_reviews",
+      !subAdminDeletesUserReviews.ok,
+      JSON.stringify(subAdminDeletesUserReviews.body)
+    );
+
+    // Doesn't have moderate_market -- CANNOT touch marketplace admin
+    // actions.
+    const subAdminTogglesMarketplace = await rpc(strangerToken, "toggle_marketplace", {});
+    check(
+      "a sub-admin WITHOUT moderate_market cannot call toggle_marketplace",
+      !subAdminTogglesMarketplace.ok,
+      JSON.stringify(subAdminTogglesMarketplace.body)
+    );
+
+    // Doesn't have manage_users -- CANNOT manage other users, even though
+    // they're an admin themselves.
+    const subAdminSuspendsSomeone = await rpc(strangerToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+    check(
+      "a sub-admin WITHOUT manage_users cannot call set_user_suspended",
+      !subAdminSuspendsSomeone.ok,
+      JSON.stringify(subAdminSuspendsSomeone.body)
+    );
+
+    const subAdminVerifiesSomeone = await rpc(strangerToken, "set_user_verified", { p_user_id: strangerUid, p_verified: true });
+    check(
+      "a sub-admin WITHOUT manage_users cannot call set_user_verified",
+      !subAdminVerifiesSomeone.ok,
+      JSON.stringify(subAdminVerifiesSomeone.body)
+    );
+
+    // Invalid permission key rejected outright.
+    const badPermission = await rpc(adminToken, "set_user_role", {
+      p_user_id: strangerUid,
+      p_role: "admin",
+      p_permissions: ["not_a_real_permission"],
+    });
+    check("set_user_role rejects an unknown permission key", !badPermission.ok, JSON.stringify(badPermission.body));
+
+    // Super admin protections.
+    const cannotSuspendSuperAdmin = await rpc(adminToken, "set_user_suspended", { p_user_id: admin.user.id, p_suspended: true });
+    check(
+      "the super admin cannot be suspended (self-suspend guard covers this case)",
+      !cannotSuspendSuperAdmin.ok,
+      JSON.stringify(cannotSuspendSuperAdmin.body)
+    );
+
+    const directIsSuperAdminEdit = await patch(adminToken, `/profiles?id=eq.${strangerUid}`, { is_super_admin: true }, "return=representation");
+    check(
+      "is_super_admin can never be set via direct PATCH, even by the super admin",
+      // Either the RLS policy blocks the direct write outright (no rows
+      // matched -- admins can't PATCH another user's profile row at all,
+      // only via RPCs) or the row comes back with is_super_admin still
+      // false (the trigger reverted it). Both mean "it can never be set."
+      (directIsSuperAdminEdit.body ?? []).every((row) => row.is_super_admin === false),
+      JSON.stringify(directIsSuperAdminEdit.body)
+    );
+
+    // Cleanup: demote stranger back to a plain student, delete the test
+    // post -- later sections assume stranger is an ordinary non-admin.
+    const cleanupDemote = await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "student" });
+    const afterCleanup = await get(adminToken, `/profiles?id=eq.${strangerUid}&select=role,admin_permissions`);
+    check(
+      "demoting back to student clears admin_permissions too",
+      cleanupDemote.ok && afterCleanup.body?.[0]?.role === "student" && JSON.stringify(afterCleanup.body?.[0]?.admin_permissions) === JSON.stringify([]),
+      JSON.stringify(afterCleanup.body)
+    );
+
+    if (subAdminTestPostId) await del(adminToken, `/buzz_posts?id=eq.${subAdminTestPostId}`);
+  }
+
+  // =====================================================================
   // Buzz (Session 17): public read, author-or-admin write, is_admin_post/
   // author_name/is_pinned tamper protection, reply_count + pin-cap
   // triggers, suspend enforcement.

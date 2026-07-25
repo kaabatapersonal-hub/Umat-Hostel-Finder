@@ -9,6 +9,7 @@ import { ComposeBuzzSheet } from "@/components/buzz/compose-buzz-sheet";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useBuzzFeed } from "@/hooks/use-buzz-feed";
 import { usePinnedBuzzPosts } from "@/hooks/use-pinned-buzz-posts";
+import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function BuzzPage() {
@@ -45,7 +46,13 @@ export default function BuzzPage() {
   }, [hasNextPage, fetchNextPage]);
 
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data]);
-  const pinnedPosts = pinnedQuery.data ?? [];
+  const pinnedPosts = useMemo(() => pinnedQuery.data ?? [], [pinnedQuery.data]);
+
+  const authorIds = useMemo(
+    () => [...pinnedPosts, ...posts].map((p) => p.authorId),
+    [pinnedPosts, posts]
+  );
+  const { data: verifiedMap } = useVerifiedProfiles(authorIds);
 
   async function handleRefresh() {
     await Promise.all([refetch(), pinnedQuery.refetch()]);
@@ -65,7 +72,14 @@ export default function BuzzPage() {
               </div>
               <div className="flex flex-col gap-3">
                 {pinnedPosts.map((post, i) => (
-                  <BuzzPostCard key={post.id} post={post} index={i} animateIn={!isFirstPaintRef.current} />
+                  <BuzzPostCard
+                    key={post.id}
+                    post={post}
+                    index={i}
+                    animateIn={!isFirstPaintRef.current}
+                    isAuthorVerified={verifiedMap?.has(post.authorId) ?? false}
+                    authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
+                  />
                 ))}
               </div>
             </div>
@@ -99,7 +113,14 @@ export default function BuzzPage() {
             <>
               <div className="flex flex-col gap-3">
                 {posts.map((post, i) => (
-                  <BuzzPostCard key={post.id} post={post} index={i} animateIn={!isFirstPaintRef.current} />
+                  <BuzzPostCard
+                    key={post.id}
+                    post={post}
+                    index={i}
+                    animateIn={!isFirstPaintRef.current}
+                    isAuthorVerified={verifiedMap?.has(post.authorId) ?? false}
+                    authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
+                  />
                 ))}
               </div>
 

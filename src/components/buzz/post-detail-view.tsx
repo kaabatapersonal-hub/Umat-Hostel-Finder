@@ -14,6 +14,7 @@ import { useBuzzPost } from "@/hooks/use-buzz-post";
 import { useBuzzReplies } from "@/hooks/use-buzz-replies";
 import { useCreateBuzzReply } from "@/hooks/use-create-buzz-reply";
 import { useKeyboardInset, useIsKeyboardOpen } from "@/hooks/use-keyboard-inset";
+import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import type { GifResult } from "@/lib/queries/gifs";
 
 const REPLY_MIN_LENGTH = 2;
@@ -33,6 +34,12 @@ export function PostDetailView({ postId }: { postId: string }) {
   const createReply = useCreateBuzzReply();
 
   const replies = useMemo(() => repliesQuery.data?.pages.flatMap((page) => page.replies) ?? [], [repliesQuery.data]);
+
+  const authorIds = useMemo(
+    () => [...(post ? [post.authorId] : []), ...replies.map((r) => r.authorId)],
+    [post, replies]
+  );
+  const { data: verifiedMap } = useVerifiedProfiles(authorIds);
 
   // The user may have scrolled up to read older replies before tapping the
   // input -- once the keyboard actually opens (not on focus, which fires
@@ -85,7 +92,12 @@ export function PostDetailView({ postId }: { postId: string }) {
         />
       ) : (
         <>
-          <BuzzPostCard post={post} linkToDetail={false} />
+          <BuzzPostCard
+            post={post}
+            linkToDetail={false}
+            isAuthorVerified={verifiedMap?.has(post.authorId) ?? false}
+            authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
+          />
 
           <h2 className="font-display text-h1 text-ink-900">Replies ({post.replyCount})</h2>
 
@@ -99,7 +111,12 @@ export function PostDetailView({ postId }: { postId: string }) {
           ) : (
             <div className="flex flex-col gap-2">
               {replies.map((reply) => (
-                <ReplyCard key={reply.id} reply={reply} />
+                <ReplyCard
+                  key={reply.id}
+                  reply={reply}
+                  isAuthorVerified={verifiedMap?.has(reply.authorId) ?? false}
+                  authorVerificationLabel={verifiedMap?.get(reply.authorId) ?? null}
+                />
               ))}
               <div ref={repliesEndRef} aria-hidden />
             </div>

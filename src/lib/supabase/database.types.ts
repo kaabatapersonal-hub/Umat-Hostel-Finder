@@ -18,6 +18,10 @@ export interface Database {
           is_suspended: boolean;
           is_leaving_sale: boolean;
           leaving_date: string | null;
+          is_verified: boolean;
+          verification_label: string | null;
+          is_super_admin: boolean;
+          admin_permissions: Json;
           created_at: string;
           updated_at: string;
         };
@@ -30,6 +34,10 @@ export interface Database {
           is_suspended?: boolean;
           is_leaving_sale?: boolean;
           leaving_date?: string | null;
+          is_verified?: boolean;
+          verification_label?: string | null;
+          is_super_admin?: boolean;
+          admin_permissions?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -42,6 +50,10 @@ export interface Database {
           is_suspended?: boolean;
           is_leaving_sale?: boolean;
           leaving_date?: string | null;
+          is_verified?: boolean;
+          verification_label?: string | null;
+          is_super_admin?: boolean;
+          admin_permissions?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -722,7 +734,7 @@ export interface Database {
         Returns: boolean;
       };
       set_user_role: {
-        Args: { p_user_id: string; p_role: string };
+        Args: { p_user_id: string; p_role: string; p_permissions?: string[] | null };
         Returns: undefined;
       };
       set_user_suspended: {
@@ -842,7 +854,17 @@ export interface Database {
           created_at: string;
           is_leaving_sale: boolean;
           leaving_date: string | null;
+          is_verified: boolean;
+          verification_label: string | null;
         }[];
+      };
+      set_user_verified: {
+        Args: { p_user_id: string; p_verified: boolean; p_label?: string | null };
+        Returns: undefined;
+      };
+      get_verified_profiles: {
+        Args: { p_user_ids: string[] };
+        Returns: { id: string; verification_label: string | null }[];
       };
       toggle_marketplace: {
         Args: Record<PropertyKey, never>;
@@ -872,6 +894,11 @@ export interface Database {
 // generated-database-types one.
 export type Availability = "available" | "filling" | "full";
 export type ProfileRole = "student" | "admin";
+// 'manage_admins' is deliberately excluded -- it's never actually stored
+// in anyone's admin_permissions array (see set_user_role's own CHECK);
+// promoting/demoting and setting permissions is super-admin-only,
+// checked via is_super_admin() directly, not the permission array.
+export type AdminPermission = "manage_hostels" | "manage_users" | "moderate_buzz" | "moderate_reviews" | "moderate_market";
 export type SubmissionStatus = "pending" | "approved" | "rejected";
 export type RoommateRequestStatus = "pending" | "accepted" | "declined";
 export type MarketCategory =

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import type { ProfileRole } from "@/lib/supabase/database.types";
+import type { ProfileRole, AdminPermission } from "@/lib/supabase/database.types";
 import { AuthSheet } from "@/components/auth/auth-sheet";
 
 export interface Profile {
@@ -12,6 +12,13 @@ export interface Profile {
   email: string | null;
   avatarUrl: string | null;
   role: ProfileRole;
+  isVerified: boolean;
+  verificationLabel: string | null;
+  // Only ever meaningful when role === 'admin' -- a student's row always
+  // has isSuperAdmin=false, adminPermissions=[]. See admin-shell.tsx for
+  // how these gate which admin tabs render.
+  isSuperAdmin: boolean;
+  adminPermissions: AdminPermission[];
 }
 
 interface AuthContextValue {
@@ -61,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     supabase
       .from("profiles")
-      .select("id, full_name, email, avatar_url, role, is_suspended")
+      .select("id, full_name, email, avatar_url, role, is_suspended, is_verified, verification_label, is_super_admin, admin_permissions")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -82,6 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: data.email,
                 avatarUrl: data.avatar_url,
                 role: (data.role as ProfileRole) ?? "student",
+                isVerified: data.is_verified,
+                verificationLabel: data.verification_label,
+                isSuperAdmin: data.is_super_admin,
+                adminPermissions: Array.isArray(data.admin_permissions) ? (data.admin_permissions as AdminPermission[]) : [],
               }
             : null
         );

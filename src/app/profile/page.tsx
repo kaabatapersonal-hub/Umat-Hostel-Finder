@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { Skeleton, SkeletonLine, SkeletonRow } from "@/components/ui/skeleton";
 import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
 import { useAuth } from "@/providers/auth-provider";
@@ -195,9 +196,10 @@ export default function ProfilePage() {
           {getInitials(profile?.fullName, profile?.email ?? user.email)}
         </div>
         <div className="flex min-w-0 flex-col">
-          <span className="line-clamp-1 font-display text-h1 text-ink-900">
-            {profile?.fullName || "Student"}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="line-clamp-1 font-display text-h1 text-ink-900">{profile?.fullName || "Student"}</span>
+            {profile?.isVerified && <VerifiedBadge label={profile.verificationLabel} />}
+          </div>
           <span className="line-clamp-1 text-body-sm text-ink-500">{profile?.email ?? user.email}</span>
         </div>
       </div>

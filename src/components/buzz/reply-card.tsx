@@ -3,20 +3,27 @@
 import { useState } from "react";
 import Image from "next/image";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { PostActionsMenu } from "./post-actions-menu";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzReply } from "@/hooks/use-delete-buzz-reply";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzReply } from "@/lib/queries/buzz";
 
-export function ReplyCard({ reply }: { reply: BuzzReply }) {
+export interface ReplyCardProps {
+  reply: BuzzReply;
+  isAuthorVerified?: boolean;
+  authorVerificationLabel?: string | null;
+}
+
+export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationLabel = null }: ReplyCardProps) {
   const { user, profile } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteReply = useDeleteBuzzReply(reply.postId);
 
-  const isAdmin = profile?.role === "admin";
   const isOwn = !!user && user.id === reply.authorId;
-  const canModerate = isOwn || isAdmin;
+  const canModerate = isOwn || hasAdminPermission(profile, "moderate_buzz");
 
   const actions = canModerate ? [{ label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) }] : [];
 
@@ -28,6 +35,7 @@ export function ReplyCard({ reply }: { reply: BuzzReply }) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-1.5">
           <span className="text-body-sm font-medium text-ink-900">{reply.authorName || "Student"}</span>
+          {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
           <span className="text-caption text-ink-300">{formatRelativeTime(reply.createdAt)}</span>
         </div>
         {reply.gifUrl ? (

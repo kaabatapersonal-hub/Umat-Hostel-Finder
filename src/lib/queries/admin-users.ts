@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, ProfileRole } from "@/lib/supabase/database.types";
+import type { Database, ProfileRole, AdminPermission } from "@/lib/supabase/database.types";
 
 export interface AdminUserRow {
   id: string;
@@ -8,6 +8,10 @@ export interface AdminUserRow {
   avatarUrl: string | null;
   role: ProfileRole;
   isSuspended: boolean;
+  isVerified: boolean;
+  verificationLabel: string | null;
+  isSuperAdmin: boolean;
+  adminPermissions: AdminPermission[];
   createdAt: string;
   reviewCount: number;
   saveCount: number;
@@ -56,7 +60,9 @@ export async function getAdminUsers(
 ): Promise<GetAdminUsersResult> {
   let query = supabase
     .from("profiles")
-    .select("id, full_name, email, avatar_url, role, is_suspended, created_at")
+    .select(
+      "id, full_name, email, avatar_url, role, is_suspended, is_verified, verification_label, is_super_admin, admin_permissions, created_at"
+    )
     .order("created_at", { ascending: sort === "oldest" })
     .range(offset, offset + limit - 1);
 
@@ -97,6 +103,10 @@ export async function getAdminUsers(
       avatarUrl: row.avatar_url,
       role: (row.role as ProfileRole) ?? "student",
       isSuspended: row.is_suspended,
+      isVerified: row.is_verified,
+      verificationLabel: row.verification_label,
+      isSuperAdmin: row.is_super_admin,
+      adminPermissions: Array.isArray(row.admin_permissions) ? (row.admin_permissions as AdminPermission[]) : [],
       createdAt: row.created_at,
       reviewCount: counts?.reviewCount ?? 0,
       saveCount: counts?.saveCount ?? 0,
@@ -143,6 +153,10 @@ export interface AdminUserDetail {
   avatarUrl: string | null;
   role: ProfileRole;
   isSuspended: boolean;
+  isVerified: boolean;
+  verificationLabel: string | null;
+  isSuperAdmin: boolean;
+  adminPermissions: AdminPermission[];
   createdAt: string;
   reviews: AdminUserReviewRow[];
   savedHostels: AdminUserSavedHostelRow[];
@@ -159,7 +173,9 @@ export async function getAdminUserDetail(
 ): Promise<AdminUserDetail | null> {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, email, avatar_url, role, is_suspended, created_at")
+    .select(
+      "id, full_name, email, avatar_url, role, is_suspended, is_verified, verification_label, is_super_admin, admin_permissions, created_at"
+    )
     .eq("id", userId)
     .maybeSingle();
 
@@ -209,6 +225,10 @@ export async function getAdminUserDetail(
     avatarUrl: profile.avatar_url,
     role: (profile.role as ProfileRole) ?? "student",
     isSuspended: profile.is_suspended,
+    isVerified: profile.is_verified,
+    verificationLabel: profile.verification_label,
+    isSuperAdmin: profile.is_super_admin,
+    adminPermissions: Array.isArray(profile.admin_permissions) ? (profile.admin_permissions as AdminPermission[]) : [],
     createdAt: profile.created_at,
     reviews: reviewRows.map((r) => ({
       id: r.id,
@@ -241,8 +261,16 @@ export async function getAdminUserDetail(
 // .update() -- there's no RLS policy letting an admin write a *different*
 // user's profiles row directly (only the self-only profiles_update_own),
 // and the RPCs also carry the self-demotion/self-suspension guards.
-export async function setUserRole(supabase: SupabaseClient<Database>, userId: string, role: ProfileRole): Promise<void> {
-  const { error } = await supabase.rpc("set_user_role", { p_user_id: userId, p_role: role });
+// permissions is only meaningful when promoting to 'admin' -- set_user_role
+// resets admin_permissions to [] server-side whenever role isn't 'admin',
+// regardless of what's passed here.
+export async function setUserRole(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  role: ProfileRole,
+  permissions?: AdminPermission[]
+): Promise<void> {
+  const { error } = await supabase.rpc("set_user_role", { p_user_id: userId, p_role: role, p_permissions: permissions ?? null });
   if (error) throw error;
 }
 
@@ -257,4 +285,16 @@ export async function deleteUserReviews(supabase: SupabaseClient<Database>, user
   const { data, error } = await supabase.rpc("delete_user_reviews", { p_user_id: userId });
   if (error) throw error;
   return data ?? 0;
+}
+
+// Verify/unverify -- same RPC-not-plain-.update() reasoning as role/
+// suspend above. p_verified=false always clears the label server-side.
+export async function setUserVerified(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  verified: boolean,
+  label?: string | null
+): Promise<void> {
+  const { error } = await supabase.rpc("set_user_verified", { p_user_id: userId, p_verified: verified, p_label: label ?? null });
+  if (error) throw error;
 }

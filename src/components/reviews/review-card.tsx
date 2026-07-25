@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Flag, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { StarRating } from "./star-rating";
 import { useDeleteReview } from "@/hooks/use-delete-review";
 import { useReportReview } from "@/hooks/use-report-review";
@@ -18,9 +19,18 @@ export interface ReviewCardProps {
   // listing" / null. Resolved by the caller so this card never needs to
   // know the rules, just the label.
   honestBadge: string | null;
+  isAuthorVerified?: boolean;
+  authorVerificationLabel?: string | null;
 }
 
-export function ReviewCard({ review, isOwn, onEdit, honestBadge }: ReviewCardProps) {
+export function ReviewCard({
+  review,
+  isOwn,
+  onEdit,
+  honestBadge,
+  isAuthorVerified = false,
+  authorVerificationLabel = null,
+}: ReviewCardProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reported, setReported] = useState(false);
   const deleteReview = useDeleteReview();
@@ -43,7 +53,10 @@ export function ReviewCard({ review, isOwn, onEdit, honestBadge }: ReviewCardPro
             {getInitials(review.reviewerName, null)}
           </div>
           <div className="flex flex-col">
-            <span className="line-clamp-1 text-body-strong text-ink-900">{review.reviewerName || "Student"}</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="line-clamp-1 text-body-strong text-ink-900">{review.reviewerName || "Student"}</span>
+              {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
+            </div>
             <span className="text-caption text-ink-500">{formatRelativeTime(review.createdAt)}</span>
           </div>
         </div>
