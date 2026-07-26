@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ConditionalAppShell } from "@/components/layout/conditional-app-shell";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { getSiteUrl } from "@/lib/site-url";
 
 const sora = Sora({
@@ -94,6 +95,7 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <ConditionalAppShell>{children}</ConditionalAppShell>
+            <InstallPrompt />
           </AuthProvider>
         </QueryProvider>
       </body>

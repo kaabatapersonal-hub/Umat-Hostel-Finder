@@ -15,11 +15,17 @@ export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref" | "ch
   children?: React.ReactNode;
 }
 
+// Disabled/loading states soften the *background* only (via a color-mix
+// opacity modifier on that one property), never the label -- text/icon
+// colors stay fully opaque. A blanket `opacity-50` on the whole button
+// used to fade background and label together as one group, which on the
+// dark variants left barely-legible white-on-washed-green text right when
+// someone's watching a submit button waiting for it to finish.
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-brand-800 text-white hover:bg-brand-900",
-  accent: "bg-gold-500 text-ink-900 hover:bg-gold-600",
-  secondary: "bg-surface text-brand-800 border border-brand-800 hover:bg-brand-50",
-  ghost: "bg-transparent text-ink-900 hover:bg-surface-muted",
+  primary: "bg-brand-800 text-white hover:bg-brand-900 disabled:bg-brand-800/65",
+  accent: "bg-gold-500 text-ink-900 hover:bg-gold-600 disabled:bg-gold-500/65",
+  secondary: "bg-surface text-brand-800 border border-brand-800 hover:bg-brand-50 disabled:border-brand-800/50",
+  ghost: "bg-transparent text-ink-900 hover:bg-surface-muted disabled:text-ink-900/60",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -41,7 +47,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         className={cn(
           "inline-flex items-center justify-center rounded-md font-medium transition-colors",
-          "disabled:opacity-50 disabled:pointer-events-none",
+          // Not a blanket opacity fade -- on the dark `primary`/`accent`
+          // variants that faded the label along with the background,
+          // leaving barely-legible text right when a user is staring at
+          // the button waiting for a submit to finish (see loading state
+          // below). Each variant instead defines its own disabled colors
+          // that stay readable.
+          "disabled:pointer-events-none",
           variantClasses[variant],
           sizeClasses[size],
           className
