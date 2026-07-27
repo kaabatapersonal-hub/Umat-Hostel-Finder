@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, PlusCircle, FileClock, PenLine, Flag, Users, ShoppingBag, ArrowLeft, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Building2, PlusCircle, FileClock, PenLine, Flag, Users, ShoppingBag, ArrowLeft, ShieldAlert, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { hasAdminPermission } from "@/lib/admin-permissions";
@@ -21,6 +21,7 @@ interface AdminTab {
 
 const TABS: AdminTab[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/hostels", label: "Hostels", icon: Building2, permission: "manage_hostels" },
   { href: "/admin/hostels/new", label: "Add Hostel", icon: PlusCircle, permission: "manage_hostels" },
   { href: "/admin/submissions", label: "Submissions", icon: FileClock, permission: "manage_hostels" },

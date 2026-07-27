@@ -667,6 +667,27 @@ async function main() {
   }
 
   // =====================================================================
+  // Admin analytics (Growth/Engagement stat cards)
+  // =====================================================================
+  section("admin analytics");
+  {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const anonActiveUsers = await rpc(null, "get_active_users_count", { p_since: since });
+    check("anon cannot call get_active_users_count (not granted to anon)", !anonActiveUsers.ok, `status ${anonActiveUsers.status}`);
+
+    const strangerActiveUsers = await rpc(strangerToken, "get_active_users_count", { p_since: since });
+    check("non-admin cannot call get_active_users_count", !strangerActiveUsers.ok, JSON.stringify(strangerActiveUsers.body));
+
+    const adminActiveUsers = await rpc(adminToken, "get_active_users_count", { p_since: since });
+    check(
+      "admin CAN call get_active_users_count and gets a number back",
+      adminActiveUsers.ok && typeof adminActiveUsers.body === "number",
+      JSON.stringify(adminActiveUsers.body)
+    );
+  }
+
+  // =====================================================================
   // Verified users (Session 22 Part 1)
   // =====================================================================
   section("verified users (Session 22)");

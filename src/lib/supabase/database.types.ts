@@ -751,6 +751,10 @@ export interface Database {
           owned_hostel_count: number;
         }[];
       };
+      get_active_users_count: {
+        Args: { p_since: string };
+        Returns: number;
+      };
       delete_user_reviews: {
         Args: { p_user_id: string };
         Returns: number;
