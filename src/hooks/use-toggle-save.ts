@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { saveHostel, unsaveHostel, type SaveableHostelInput, type SavedHostel } from "@/lib/queries/saved-hostels";
 import { useAuth } from "@/providers/auth-provider";
+import { captureEvent } from "@/lib/analytics";
 
 export function useToggleSave() {
   const { user } = useAuth();
@@ -54,6 +55,11 @@ export function useToggleSave() {
       );
 
       return { previous };
+    },
+    onSuccess: (_data, { hostel, isSaved }) => {
+      // Only the save direction is a funnel moment worth tracking --
+      // unsaving is just tidying up, not a new engagement signal.
+      if (!isSaved) captureEvent("saved_hostel", { hostel_id: hostel.id });
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous);

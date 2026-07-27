@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { ProfileRole, AdminPermission } from "@/lib/supabase/database.types";
 import { AuthSheet } from "@/components/auth/auth-sheet";
+import { identifyUser, resetIdentity } from "@/lib/analytics";
 
 export interface Profile {
   id: string;
@@ -59,6 +60,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Keyed on `user` alone, not profile -- identity should attach the
+  // moment a session exists, not wait on the profile row round trip.
+  // Covers sign-in, session restore on load, and sign-out (reset) all in
+  // one place, rather than threading this through every call site that
+  // changes auth state.
+  useEffect(() => {
+    if (user) {
+      identifyUser(user.id, { email: user.email });
+    } else {
+      resetIdentity();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) {

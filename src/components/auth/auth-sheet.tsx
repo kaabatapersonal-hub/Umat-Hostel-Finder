@@ -6,6 +6,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { captureEvent } from "@/lib/analytics";
 
 type Mode = "sign-in" | "sign-up" | "magic-link";
 
@@ -92,6 +93,7 @@ export function AuthSheet({ open, onClose, onSuccess }: AuthSheetProps) {
       } else if (mode === "sign-up") {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        captureEvent("signed_up");
         // If "Confirm email" is on in Supabase Auth settings, signUp()
         // succeeds but returns no session until the user clicks the
         // confirmation link — there's nothing to resume yet.

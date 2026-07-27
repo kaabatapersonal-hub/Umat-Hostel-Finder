@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { createBuzzPost, type GetBuzzFeedResult } from "@/lib/queries/buzz";
+import { captureEvent } from "@/lib/analytics";
 
 // Not truly optimistic (no pre-confirmation insert + rollback) -- the
 // mutation is awaited as normal, but on success the real returned row is
@@ -29,6 +30,7 @@ export function useCreateBuzzPost() {
         return { ...old, pages: [{ ...firstPage, posts: [newPost, ...firstPage.posts] }, ...rest] };
       });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      captureEvent("posted_buzz", { post_id: newPost.id });
     },
   });
 }
