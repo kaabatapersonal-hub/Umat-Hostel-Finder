@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { Skeleton, SkeletonLine, SkeletonRow } from "@/components/ui/skeleton";
 import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
+import { LegalLinksRow } from "@/components/legal/legal-links-row";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { useMySubmissions } from "@/hooks/use-my-submissions";
@@ -182,9 +183,7 @@ export default function ProfilePage() {
           onAction={() => requireAuth(() => {})}
           className="mx-4 mt-4 bg-surface shadow-card"
         />
-        <Link href="/about" className="mx-4 mt-4 text-center text-body-sm text-ink-500 underline underline-offset-2">
-          About Campa
-        </Link>
+        <LegalLinksRow className="mx-4 mt-4 text-center" />
       </div>
     );
   }
@@ -343,9 +342,7 @@ export default function ProfilePage() {
         Sign Out
       </Button>
 
-      <Link href="/about" className="text-center text-body-sm text-ink-500 underline underline-offset-2">
-        About Campa
-      </Link>
+      <LegalLinksRow className="text-center" />
     </div>
   );
 }

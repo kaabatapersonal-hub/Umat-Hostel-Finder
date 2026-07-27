@@ -30,6 +30,16 @@ export function AboutFooter() {
         </div>
 
         <div className="flex flex-col gap-2 text-body-sm">
+          <span className="label text-caption text-white/50">Legal</span>
+          <Link href="/terms" className="text-white/80 hover:text-white">
+            Terms of Service
+          </Link>
+          <Link href="/privacy" className="text-white/80 hover:text-white">
+            Privacy Policy
+          </Link>
+        </div>
+
+        <div className="flex flex-col gap-2 text-body-sm">
           <span className="label text-caption text-white/50">Contact</span>
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-white/80 hover:text-white">
             {CONTACT_EMAIL}
