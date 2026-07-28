@@ -4,75 +4,116 @@ import { useState } from "react";
 import { z } from "zod";
 import { Sheet } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { captureEvent } from "@/lib/analytics";
-
-type Mode = "sign-in" | "sign-up" | "magic-link";
+import { useToast } from "@/components/ui/toast";
 
 const emailSchema = z.email("Enter a valid email");
-const passwordSchema = z.string().min(6, "At least 6 characters");
+const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+
+const DEFAULT_SUBTITLE = "Save hostels, post on Buzz, and sell on the Marketplace";
 
 export interface AuthSheetProps {
   open: boolean;
   onClose: () => void;
-  // Called only when a real session now exists (password sign-in/sign-up
-  // with email confirmation off). Magic link and "confirm your email"
-  // sign-ups can't call this synchronously — the user has to leave the app
-  // and come back via /auth/callback, so any pending gated action just
-  // isn't resumed automatically in that path.
+  // Overrides the default value-prop subtitle -- see requireAuth's
+  // `message` option in auth-provider.tsx.
+  message?: string;
+  // Called only when a real session now exists (password continue, or a
+  // fresh signup with email confirmation off). A confirm-email-sent or
+  // magic-link-sent state can't call this synchronously -- the user has
+  // to leave the app and come back via /auth/callback -- so any pending
+  // gated action just isn't resumed automatically in that path.
   onSuccess: () => void;
 }
 
-export function AuthSheet({ open, onClose, onSuccess }: AuthSheetProps) {
-  const [mode, setMode] = useState<Mode>("sign-in");
+// Supabase has two different ways of saying "this email is already
+// registered," depending on the project's Auth settings, and neither is a
+// thrown error in the second case:
+//  1. A real AuthError, message/code indicating the account exists.
+//  2. Anti-enumeration behavior: signUp() returns 200 with NO error and a
+//     user object, but `identities` is an empty array -- this is
+//     Supabase's deliberate way of not confirming account existence to a
+//     caller who doesn't already know the password. Checking only for a
+//     thrown error would misread this as "a new account was created."
+function looksLikeExistingAccount(error: { message?: string; code?: string } | null, user: { identities?: unknown[] } | null | undefined): boolean {
+  if (error) {
+    const message = error.message?.toLowerCase() ?? "";
+    return error.code === "user_already_exists" || message.includes("already registered") || message.includes("already exists");
+  }
+  return !!user && Array.isArray(user.identities) && user.identities.length === 0;
+}
+
+function friendlyErrorMessage(error: { message?: string } | null | undefined): string {
+  const message = error?.message ?? "";
+  if (/network|fetch/i.test(message)) return "Connection failed — check your internet and try again.";
+  if (/rate limit/i.test(message)) return "Too many attempts — wait a moment and try again.";
+  return message || "Something went wrong. Check your connection and try again.";
+}
+
+export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [wrongPassword, setWrongPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [confirmEmailSent, setConfirmEmailSent] = useState(false);
+  const { showToast } = useToast();
 
   function resetTransientState() {
     setErrors({});
     setFormError(null);
+    setWrongPassword(false);
     setMagicLinkSent(false);
     setConfirmEmailSent(false);
-  }
-
-  function switchMode(next: Mode) {
-    setMode(next);
-    resetTransientState();
   }
 
   function handleClose() {
     setEmail("");
     setPassword("");
     resetTransientState();
-    setMode("sign-in");
     onClose();
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function sendMagicLink() {
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
+      setErrors((prev) => ({ ...prev, email: emailResult.error.issues[0]?.message }));
+      return;
+    }
+    setErrors({});
+    setFormError(null);
+    setMagicLinkLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) throw error;
+      setMagicLinkSent(true);
+    } catch (err) {
+      setFormError(friendlyErrorMessage(err instanceof Error ? { message: err.message } : null));
+    } finally {
+      setMagicLinkLoading(false);
+    }
+  }
+
+  async function handleContinue(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    setWrongPassword(false);
 
     const emailResult = emailSchema.safeParse(email);
+    const passwordResult = passwordSchema.safeParse(password);
     const nextErrors: typeof errors = {};
     if (!emailResult.success) nextErrors.email = emailResult.error.issues[0]?.message;
-
-    // The 6-character minimum is a sign-up-time UX nicety, not something to
-    // enforce on sign-in — an existing account's real password is whatever
-    // it is, and the server is the authority on whether it's correct.
-    // Blocking submission client-side here would lock out real accounts.
-    if (mode === "sign-up") {
-      const passwordResult = passwordSchema.safeParse(password);
-      if (!passwordResult.success) nextErrors.password = passwordResult.error.issues[0]?.message;
-    } else if (mode === "sign-in" && password.length === 0) {
-      nextErrors.password = "Enter your password";
-    }
-
+    if (!passwordResult.success) nextErrors.password = passwordResult.error.issues[0]?.message;
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -83,48 +124,55 @@ export function AuthSheet({ open, onClose, onSuccess }: AuthSheetProps) {
     const supabase = createClient();
 
     try {
-      if (mode === "magic-link") {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-        });
-        if (error) throw error;
-        setMagicLinkSent(true);
-      } else if (mode === "sign-up") {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        captureEvent("signed_up");
-        // If "Confirm email" is on in Supabase Auth settings, signUp()
-        // succeeds but returns no session until the user clicks the
-        // confirmation link — there's nothing to resume yet.
-        if (data.session) {
-          onSuccess();
-        } else {
-          setConfirmEmailSent(true);
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (!signInError) {
         onSuccess();
+        return;
+      }
+
+      // Sign-in failed -- could mean "no account with this email yet"
+      // (fine, create one) or "wrong password on an existing account"
+      // (not fine). signUp's own response tells them apart -- see
+      // looksLikeExistingAccount.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+
+      if (looksLikeExistingAccount(signUpError, signUpData?.user)) {
+        setWrongPassword(true);
+        setFormError("Wrong password — try again or get a sign-in link below.");
+        return;
+      }
+
+      if (signUpError) {
+        setFormError(friendlyErrorMessage(signUpError));
+        return;
+      }
+
+      captureEvent("signed_up");
+      if (signUpData.session) {
+        showToast({ message: "Welcome to Campa! 🏠", variant: "success" });
+        onSuccess();
+      } else {
+        // "Confirm email" is on in Supabase Auth settings -- signUp
+        // succeeded but there's no session until they click the
+        // confirmation link. Nothing to resume yet.
+        setConfirmEmailSent(true);
       }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Something went wrong. Check your connection and try again.");
+      setFormError(friendlyErrorMessage(err instanceof Error ? { message: err.message } : null));
     } finally {
       setLoading(false);
     }
   }
 
-  const title = mode === "sign-up" ? "Create your account" : mode === "magic-link" ? "Email me a link" : "Sign in";
-
   return (
-    <Sheet open={open} onClose={handleClose} title={title}>
+    <Sheet open={open} onClose={handleClose} title="Join Campa 🏠">
       {magicLinkSent ? (
         <div className="flex flex-col gap-4 text-center">
           <p className="text-body text-ink-500">
             Check <span className="font-medium text-ink-900">{email}</span> for a sign-in link. Open it on this
             device to continue.
           </p>
-          <Button variant="ghost" onClick={() => switchMode("sign-in")}>
+          <Button variant="ghost" onClick={() => resetTransientState()}>
             Back
           </Button>
         </div>
@@ -132,19 +180,15 @@ export function AuthSheet({ open, onClose, onSuccess }: AuthSheetProps) {
         <div className="flex flex-col gap-4 text-center">
           <p className="text-body text-ink-500">
             Almost there — confirm <span className="font-medium text-ink-900">{email}</span> using the link we just
-            sent, then sign in.
+            sent, then come back and continue.
           </p>
-          <Button variant="ghost" onClick={() => switchMode("sign-in")}>
-            Back to sign in
+          <Button variant="ghost" onClick={() => resetTransientState()}>
+            Back
           </Button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <p className="text-body-sm text-ink-500">
-            {mode === "sign-up"
-              ? "Save hostels and post reviews with a free account."
-              : "Sign in to save hostels and post reviews."}
-          </p>
+        <form onSubmit={handleContinue} className="flex flex-col gap-4">
+          <p className="text-body-sm text-ink-500">{message ?? DEFAULT_SUBTITLE}</p>
 
           <Input
             label="Email"
@@ -155,61 +199,42 @@ export function AuthSheet({ open, onClose, onSuccess }: AuthSheetProps) {
             error={errors.email}
           />
 
-          {mode !== "magic-link" && (
-            <Input
-              label="Password"
-              type="password"
-              autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={errors.password}
-            />
+          <PasswordInput
+            label="Password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={errors.password}
+          />
+
+          {formError && (
+            <div className="flex flex-col gap-2 rounded-md bg-danger/10 p-3">
+              <p className="text-body-sm text-danger">{formError}</p>
+              {wrongPassword && (
+                <button
+                  type="button"
+                  onClick={sendMagicLink}
+                  disabled={magicLinkLoading}
+                  className="self-start text-body-sm font-medium text-brand-800 underline underline-offset-2 disabled:opacity-50"
+                >
+                  {magicLinkLoading ? "Sending…" : "Send me a link"}
+                </button>
+              )}
+            </div>
           )}
 
-          {formError && <p className="text-body-sm text-danger">{formError}</p>}
-
-          <Button type="submit" variant="primary" size="lg" loading={loading}>
-            {mode === "sign-up" ? "Sign Up" : mode === "magic-link" ? "Email me a link" : "Sign In"}
+          <Button type="submit" variant="accent" size="lg" loading={loading}>
+            Continue
           </Button>
 
-          <div className="flex flex-col items-center gap-2 pt-1 text-body-sm">
-            {mode === "sign-in" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => switchMode("sign-up")}
-                  className="text-brand-800 underline underline-offset-2"
-                >
-                  Don&apos;t have an account? Sign up
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchMode("magic-link")}
-                  className="text-ink-500 underline underline-offset-2"
-                >
-                  Sign in on a new device? Email me a link
-                </button>
-              </>
-            )}
-            {mode === "sign-up" && (
-              <button
-                type="button"
-                onClick={() => switchMode("sign-in")}
-                className="text-brand-800 underline underline-offset-2"
-              >
-                Already have an account? Sign in
-              </button>
-            )}
-            {mode === "magic-link" && (
-              <button
-                type="button"
-                onClick={() => switchMode("sign-in")}
-                className="text-ink-500 underline underline-offset-2"
-              >
-                Back to password sign-in
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={sendMagicLink}
+            disabled={magicLinkLoading}
+            className="text-center text-body-sm text-ink-500 underline underline-offset-2 disabled:opacity-50"
+          >
+            {magicLinkLoading ? "Sending…" : "Or sign in with email link"}
+          </button>
         </form>
       )}
     </Sheet>

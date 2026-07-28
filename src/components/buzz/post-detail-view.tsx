@@ -19,6 +19,7 @@ import type { GifResult } from "@/lib/queries/gifs";
 
 const REPLY_MIN_LENGTH = 2;
 const REPLY_MAX_LENGTH = 300;
+const BUZZ_REPLY_JOIN_MESSAGE = "Join Campa to reply — share hostel tips, find roommates, ask questions";
 
 export function PostDetailView({ postId }: { postId: string }) {
   const router = useRouter();
@@ -55,9 +56,12 @@ export function PostDetailView({ postId }: { postId: string }) {
   function handleSend() {
     const trimmed = replyText.trim();
     if (trimmed.length < REPLY_MIN_LENGTH) return;
-    requireAuth(() => {
-      createReply.mutate({ postId, content: trimmed }, { onSuccess: () => setReplyText("") });
-    });
+    requireAuth(
+      () => {
+        createReply.mutate({ postId, content: trimmed }, { onSuccess: () => setReplyText("") });
+      },
+      { message: BUZZ_REPLY_JOIN_MESSAGE }
+    );
   }
 
   // Sends immediately on pick -- the GIF picker has no separate "send"
@@ -149,7 +153,7 @@ export function PostDetailView({ postId }: { postId: string }) {
           <button
             type="button"
             aria-label="Send a GIF"
-            onClick={() => requireAuth(() => setGifPickerOpen(true))}
+            onClick={() => requireAuth(() => setGifPickerOpen(true), { message: BUZZ_REPLY_JOIN_MESSAGE })}
             className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-500 hover:bg-surface-muted"
           >
             <ImagePlay className="size-5" />

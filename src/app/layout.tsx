@@ -5,6 +5,7 @@ import { QueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ConditionalAppShell } from "@/components/layout/conditional-app-shell";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { ToastProvider } from "@/components/ui/toast";
 import { getSiteUrl } from "@/lib/site-url";
 
 const sora = Sora({
@@ -93,10 +94,12 @@ export default function RootLayout({
           </svg>
         </div>
         <QueryProvider>
-          <AuthProvider>
-            <ConditionalAppShell>{children}</ConditionalAppShell>
-            <InstallPrompt />
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <ConditionalAppShell>{children}</ConditionalAppShell>
+              <InstallPrompt />
+            </AuthProvider>
+          </ToastProvider>
         </QueryProvider>
       </body>
     </html>

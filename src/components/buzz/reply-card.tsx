@@ -7,7 +7,7 @@ import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { PostActionsMenu } from "./post-actions-menu";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzReply } from "@/hooks/use-delete-buzz-reply";
-import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzReply } from "@/lib/queries/buzz";
 
@@ -22,13 +22,16 @@ export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationL
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteReply = useDeleteBuzzReply(reply.postId);
 
+  // Tagged by useCreateBuzzReply's onMutate -- nothing to moderate yet,
+  // same reasoning as BuzzPostCard's isOptimistic.
+  const isOptimistic = reply.id.startsWith("optimistic-");
   const isOwn = !!user && user.id === reply.authorId;
-  const canModerate = isOwn || hasAdminPermission(profile, "moderate_buzz");
+  const canModerate = !isOptimistic && (isOwn || hasAdminPermission(profile, "moderate_buzz"));
 
   const actions = canModerate ? [{ label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) }] : [];
 
   return (
-    <div className="flex items-start gap-2.5 rounded-md bg-surface-muted p-3">
+    <div className={cn("flex items-start gap-2.5 rounded-md bg-surface-muted p-3", isOptimistic && "opacity-60")}>
       <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-caption font-semibold text-brand-800">
         {getInitials(reply.authorName, null)}
       </div>
@@ -36,7 +39,7 @@ export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationL
         <div className="flex items-center gap-1.5">
           <span className="text-body-sm font-medium text-ink-900">{reply.authorName || "Student"}</span>
           {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
-          <span className="text-caption text-ink-300">{formatRelativeTime(reply.createdAt)}</span>
+          <span className="text-caption text-ink-300">{isOptimistic ? "Sending…" : formatRelativeTime(reply.createdAt)}</span>
         </div>
         {reply.gifUrl ? (
           <div className="relative mt-0.5 aspect-square w-40 max-w-full overflow-hidden rounded-md bg-surface">

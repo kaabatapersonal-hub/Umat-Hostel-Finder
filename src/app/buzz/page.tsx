@@ -12,6 +12,8 @@ import { usePinnedBuzzPosts } from "@/hooks/use-pinned-buzz-posts";
 import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import { useAuth } from "@/providers/auth-provider";
 
+const BUZZ_JOIN_MESSAGE = "Join Campa to post on Buzz — share hostel tips, find roommates, ask questions";
+
 export default function BuzzPage() {
   const { requireAuth } = useAuth();
   const [composeOpen, setComposeOpen] = useState(false);
@@ -106,7 +108,7 @@ export default function BuzzPage() {
               title="No posts yet"
               description="Be the first to share something about hostels near UMaT."
               actionLabel="Post something"
-              onAction={() => requireAuth(() => setComposeOpen(true))}
+              onAction={() => requireAuth(() => setComposeOpen(true), { message: BUZZ_JOIN_MESSAGE })}
               className="bg-surface shadow-card"
             />
           ) : (
@@ -141,7 +143,7 @@ export default function BuzzPage() {
       <button
         type="button"
         aria-label="New post"
-        onClick={() => requireAuth(() => setComposeOpen(true))}
+        onClick={() => requireAuth(() => setComposeOpen(true), { message: BUZZ_JOIN_MESSAGE })}
         className="fixed right-4 z-40 flex size-14 items-center justify-center rounded-full bg-gold-500 text-ink-900 shadow-md transition-transform active:scale-95"
         style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}
       >

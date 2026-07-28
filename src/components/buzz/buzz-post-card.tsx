@@ -51,13 +51,19 @@ export function BuzzPostCard({
   const deletePost = useDeleteBuzzPost();
   const setPinned = useSetBuzzPostPinned();
 
+  // Tagged with this id prefix by useCreateBuzzPost's onMutate -- same
+  // placeholder-id convention useToggleSave already uses. Nothing about
+  // this post exists server-side yet: no detail page to link to, no
+  // reactions/replies/moderation possible until the real row lands.
+  const isOptimistic = post.id.startsWith("optimistic-");
+
   // moderate_buzz, not a blanket role === 'admin' check -- a sub-admin
   // without this permission gets no Pin/Delete-others'-post actions here,
   // matching what the retrofitted buzz_posts RLS policies now enforce
   // server-side too (see Session 22 Part 2 in SECURITY.md).
   const canModerateBuzz = hasAdminPermission(profile, "moderate_buzz");
   const isOwn = !!user && user.id === post.authorId;
-  const canModerate = isOwn || canModerateBuzz;
+  const canModerate = !isOptimistic && (isOwn || canModerateBuzz);
 
   const actions = canModerate
     ? [
@@ -73,7 +79,8 @@ export function BuzzPostCard({
       className={cn(
         "flex flex-col gap-2.5 rounded-lg p-4",
         linkToDetail ? "bg-surface shadow-card active:scale-[0.99] transition-transform" : "bg-brand-50/40 shadow-card",
-        post.isAdminPost && "border-l-4 border-brand-800"
+        post.isAdminPost && "border-l-4 border-brand-800",
+        isOptimistic && "opacity-60"
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -106,17 +113,27 @@ export function BuzzPostCard({
         </div>
       </div>
 
-      <LinkifiedContent content={post.content} className={linkToDetail ? "line-clamp-3" : undefined} />
+      <LinkifiedContent
+        content={post.content}
+        className={linkToDetail ? "line-clamp-3" : undefined}
+        linkify={!linkToDetail}
+      />
       {linkToDetail && post.content.length > FEED_TRUNCATION_HINT_LENGTH && (
         <span className="-mt-1.5 text-caption font-medium text-brand-800">Show more</span>
       )}
 
-      <ReactionPills postId={post.id} reactionCounts={post.reactionCounts} />
+      {!isOptimistic && <ReactionPills postId={post.id} reactionCounts={post.reactionCounts} />}
 
       <div className="flex items-center justify-between pt-1">
         <span className="flex items-center gap-1 text-caption text-ink-500">
-          <MessageCircle className="size-3.5" />
-          {post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}
+          {isOptimistic ? (
+            "Posting…"
+          ) : (
+            <>
+              <MessageCircle className="size-3.5" />
+              {post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}
+            </>
+          )}
         </span>
 
         {confirmingDelete ? (
@@ -157,7 +174,7 @@ export function BuzzPostCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: Math.min(index, 10) * 0.04, ease: [0.22, 1, 0.36, 1] }}
     >
-      {linkToDetail ? (
+      {linkToDetail && !isOptimistic ? (
         <Link href={`/buzz/${post.id}`} className="block">
           {cardBody}
         </Link>

@@ -174,12 +174,12 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="flex flex-col">
-        <PageHeader title="Profile" subtitle="Sign in to manage your saves and submissions" />
+        <PageHeader title="Profile" subtitle="Join Campa to manage your saves and submissions" />
         <EmptyState
           icon={<UserCircle2 className="size-7" strokeWidth={1.75} />}
-          title="You're not signed in"
-          description="Sign in to save hostels, submit your own listing, and get updates on availability."
-          actionLabel="Sign In"
+          title="Your hostel shortlist lives here"
+          description="Join Campa to start saving hostels, post on Buzz, and submit your own listing."
+          actionLabel="Join Campa"
           onAction={() => requireAuth(() => {})}
           className="mx-4 mt-4 bg-surface shadow-card"
         />

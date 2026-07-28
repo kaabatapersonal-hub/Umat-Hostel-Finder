@@ -9,6 +9,7 @@ import { SmartImage } from "@/components/ui/smart-image";
 import { HostelPhotoPlaceholder } from "@/components/hostels/hostel-photo-placeholder";
 import { SaveHeartButton } from "@/components/hostels/save-heart-button";
 import { buildWhatsAppLink, buildHostelInquiryMessage } from "@/lib/contact";
+import { useAuth } from "@/providers/auth-provider";
 import type { UploadedImage } from "@/lib/images";
 import type { SaveableHostelInput } from "@/lib/queries/saved-hostels";
 
@@ -28,6 +29,7 @@ export interface ImageGalleryProps {
 
 export function ImageGallery({ images, hostel, whatsappNumber }: ImageGalleryProps) {
   const router = useRouter();
+  const { user, requireAuth } = useAuth();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -101,7 +103,20 @@ export function ImageGallery({ images, hostel, whatsappNumber }: ImageGalleryPro
         <ArrowLeft className="size-5" />
       </button>
 
-      <SaveHeartButton hostel={hostel} className="absolute right-3 top-3" />
+      <div className="absolute right-3 top-3 flex items-center gap-2">
+        {!user && (
+          <button
+            type="button"
+            onClick={() =>
+              requireAuth(() => {}, { message: `Join Campa to save ${hostel.name} and other hostels you like` })
+            }
+            className="rounded-pill bg-ink-900/40 px-3 py-1.5 text-caption font-medium text-white backdrop-blur-sm"
+          >
+            Save this hostel?
+          </button>
+        )}
+        <SaveHeartButton hostel={hostel} />
+      </div>
 
       {hasImages && images.length > 1 && (
         <>

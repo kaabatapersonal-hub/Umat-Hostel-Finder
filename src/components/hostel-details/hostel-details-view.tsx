@@ -7,6 +7,8 @@ import { AlertCircle, Building2 } from "lucide-react";
 import { useHostel } from "@/hooks/use-hostel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/providers/auth-provider";
+import { trackHostelView } from "@/lib/nudges";
 import type { HostelDetails } from "@/lib/queries/hostels";
 import { mergeGalleryImages } from "@/lib/room-types";
 import { ImageGallery } from "./image-gallery";
@@ -32,12 +34,21 @@ export interface HostelDetailsViewProps {
 }
 
 export function HostelDetailsView({ id, initialHostel }: HostelDetailsViewProps) {
+  const { user } = useAuth();
   const {
     data: hostel,
     isPending,
     isError,
     refetch,
   } = useHostel(id, { initialData: initialHostel });
+
+  // Signed-out only -- powers the "browsed 3+ hostels" nudge banner on
+  // the home feed (see lib/nudges.ts). A signed-in visitor never needs
+  // the nudge, so there's nothing worth tracking for them.
+  const hostelId = hostel?.id;
+  useEffect(() => {
+    if (!user && hostelId) trackHostelView(hostelId);
+  }, [user, hostelId]);
 
   // True only during the very first render. Content shown then is either
   // already part of the server-sent HTML (SSR initialHostel) or, if not,

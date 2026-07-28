@@ -22,6 +22,14 @@ export interface Profile {
   adminPermissions: AdminPermission[];
 }
 
+interface RequireAuthOptions {
+  // Overrides the sheet's default value-prop subtitle with something
+  // specific to whatever gated the user just now (Buzz's "Join Campa to
+  // post on Buzz...", the save heart's "Join Campa to save this
+  // hostel..."). Falls back to the generic subtitle when omitted.
+  message?: string;
+}
+
 interface AuthContextValue {
   user: User | null;
   profile: Profile | null;
@@ -31,7 +39,7 @@ interface AuthContextValue {
   // immediately if signed in, otherwise open the sheet and remember it, so
   // it resumes automatically the moment sign-in succeeds — the user never
   // has to repeat the tap that got them here.
-  requireAuth: (action: () => void) => void;
+  requireAuth: (action: () => void, options?: RequireAuthOptions) => void;
   signOut: () => Promise<void>;
 }
 
@@ -42,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [sheetMessage, setSheetMessage] = useState<string | undefined>(undefined);
   const pendingActionRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -113,12 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
   }, [user]);
 
-  function requireAuth(action: () => void) {
+  function requireAuth(action: () => void, options?: RequireAuthOptions) {
     if (user) {
       action();
       return;
     }
     pendingActionRef.current = action;
+    setSheetMessage(options?.message);
     setIsSheetOpen(true);
   }
 
@@ -147,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
       <AuthSheet
         open={isSheetOpen}
+        message={sheetMessage}
         onClose={() => {
           setIsSheetOpen(false);
           pendingActionRef.current = null;

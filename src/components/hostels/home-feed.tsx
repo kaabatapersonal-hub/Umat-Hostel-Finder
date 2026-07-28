@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Search, Building2, AlertCircle, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -16,6 +17,20 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAuth } from "@/providers/auth-provider";
 import { useHostelFilters } from "@/hooks/use-hostel-filters";
 import { DEFAULT_FILTERS, hasActiveFilters, type GetHostelsResult } from "@/lib/queries/hostels";
+
+// Reads sessionStorage to decide whether to render at all -- genuinely
+// unavailable server-side, not just inconvenient. Rendering it during SSR
+// would mean the server always assumes "not visible" while a client whose
+// session already crossed the 3-hostel threshold would want "visible"
+// immediately, and those two disagreeing is exactly a hydration mismatch
+// (confirmed live: React's own hydration-mismatch error, not a guess).
+// ssr:false is the same fix already used for the Leaflet map elsewhere in
+// this app for the same class of browser-only-state problem -- it simply
+// never renders server-side, so there's nothing for the client's first
+// render to disagree with.
+const BrowsingNudgeBanner = dynamic(() => import("./browsing-nudge-banner").then((m) => m.BrowsingNudgeBanner), {
+  ssr: false,
+});
 
 export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
   const [searchInput, setSearchInput] = useState("");
@@ -172,6 +187,7 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
                 <HostelCard key={hostel.id} hostel={hostel} index={i} animateIn={!isFirstPaintRef.current} />
               ))}
             </div>
+            <BrowsingNudgeBanner />
             <div ref={sentinelRef} aria-hidden className="h-1" />
             {isFetchingNextPage && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-8">
