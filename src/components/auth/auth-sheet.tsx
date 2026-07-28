@@ -11,7 +11,16 @@ import { captureEvent } from "@/lib/analytics";
 import { useToast } from "@/components/ui/toast";
 
 const emailSchema = z.email("Enter a valid email");
-const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+// Deliberately no minimum length here -- this one field now serves both
+// sign-in and sign-up, and an *existing* account's real password is
+// whatever it already is (this app has real accounts shorter than 6
+// characters from before any such rule existed). Blocking submission
+// client-side over length would lock those accounts out of their own
+// sign-in entirely. A genuinely new, too-short password still gets
+// rejected -- by Supabase itself, server-side, during the signUp call
+// below -- surfaced through the same friendlyErrorMessage() path as any
+// other signUp error.
+const passwordSchema = z.string().min(1, "Enter your password");
 
 const DEFAULT_SUBTITLE = "Save hostels, post on Buzz, and sell on the Marketplace";
 
