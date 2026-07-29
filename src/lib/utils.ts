@@ -45,3 +45,13 @@ export function getInitials(name: string | null | undefined, email: string | nul
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return source.slice(0, 2).toUpperCase();
 }
+
+// "1.2k" not "1,234" -- Buzz view counts. Intl's own compact notation
+// renders an uppercase "K"/"M" in en-US, not the lowercase social-media
+// convention the brief asks for, so this is a small hand-rolled formatter
+// rather than `Intl.NumberFormat(..., { notation: "compact" })`.
+export function formatCompactCount(count: number): string {
+  if (count < 1000) return String(count);
+  if (count < 1_000_000) return `${(count / 1000).toFixed(count % 1000 < 100 ? 0 : 1)}k`;
+  return `${(count / 1_000_000).toFixed(count % 1_000_000 < 100_000 ? 0 : 1)}m`;
+}

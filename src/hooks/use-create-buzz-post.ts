@@ -61,6 +61,8 @@ export function useCreateBuzzPost() {
         isPinned: false,
         replyCount: 0,
         likeCount: 0,
+        bookmarkCount: 0,
+        viewCount: 0,
         createdAt: new Date().toISOString(),
       };
 

@@ -508,6 +508,8 @@ export interface Database {
           is_pinned: boolean;
           reply_count: number;
           like_count: number;
+          bookmark_count: number;
+          view_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -520,6 +522,8 @@ export interface Database {
           is_pinned?: boolean;
           reply_count?: number;
           like_count?: number;
+          bookmark_count?: number;
+          view_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -532,6 +536,8 @@ export interface Database {
           is_pinned?: boolean;
           reply_count?: number;
           like_count?: number;
+          bookmark_count?: number;
+          view_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -619,6 +625,42 @@ export interface Database {
           },
           {
             foreignKeyName: "buzz_likes_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      buzz_bookmarks: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          post_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          post_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "buzz_bookmarks_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "buzz_posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "buzz_bookmarks_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -946,12 +988,18 @@ export interface Database {
           is_pinned: boolean;
           reply_count: number;
           like_count: number;
+          bookmark_count: number;
+          view_count: number;
           created_at: string;
           hot_score: number;
         }[];
       };
       resolve_buzz_report: {
         Args: { p_report_id: string; p_action: string };
+        Returns: undefined;
+      };
+      increment_buzz_view: {
+        Args: { p_post_id: string };
         Returns: undefined;
       };
       set_leaving_campus_mode: {

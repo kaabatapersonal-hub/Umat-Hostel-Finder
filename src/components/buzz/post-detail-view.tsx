@@ -17,6 +17,7 @@ import { useKeyboardInset, useIsKeyboardOpen } from "@/hooks/use-keyboard-inset"
 import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import { useMyLikedPosts } from "@/hooks/use-my-liked-posts";
 import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
+import { useMyBookmarkedPosts } from "@/hooks/use-my-bookmarked-posts";
 import type { GifResult } from "@/lib/queries/gifs";
 
 const REPLY_MIN_LENGTH = 2;
@@ -45,6 +46,7 @@ export function PostDetailView({ postId }: { postId: string }) {
   const { data: verifiedMap } = useVerifiedProfiles(authorIds);
   const { data: likedPostIds } = useMyLikedPosts(post ? [post.id] : []);
   const { data: myReports } = useMyBuzzReports();
+  const { data: bookmarkedPostIds } = useMyBookmarkedPosts(post ? [post.id] : []);
 
   // The user may have scrolled up to read older replies before tapping the
   // input -- once the keyboard actually opens (not on focus, which fires
@@ -107,6 +109,7 @@ export function PostDetailView({ postId }: { postId: string }) {
             authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
             isLiked={likedPostIds?.has(post.id) ?? false}
             isReported={myReports?.postIds.has(post.id) ?? false}
+            isBookmarked={bookmarkedPostIds?.has(post.id) ?? false}
           />
 
           <h2 className="font-display text-h1 text-ink-900">Replies ({post.replyCount})</h2>

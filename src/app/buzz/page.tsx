@@ -13,6 +13,7 @@ import { usePinnedBuzzPosts } from "@/hooks/use-pinned-buzz-posts";
 import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import { useMyLikedPosts } from "@/hooks/use-my-liked-posts";
 import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
+import { useMyBookmarkedPosts } from "@/hooks/use-my-bookmarked-posts";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +88,7 @@ export default function BuzzPage() {
   const { data: verifiedMap } = useVerifiedProfiles(authorIds);
   const { data: likedPostIds } = useMyLikedPosts(postIds);
   const { data: myReports } = useMyBuzzReports();
+  const { data: bookmarkedPostIds } = useMyBookmarkedPosts(postIds);
 
   async function handleRefresh() {
     await Promise.all([refetch(), pinnedQuery.refetch()]);
@@ -103,6 +105,7 @@ export default function BuzzPage() {
         authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
         isLiked={likedPostIds?.has(post.id) ?? false}
         isReported={myReports?.postIds.has(post.id) ?? false}
+        isBookmarked={bookmarkedPostIds?.has(post.id) ?? false}
       />
     );
   }

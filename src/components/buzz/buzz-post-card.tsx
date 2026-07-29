@@ -3,17 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { PostActionsMenu, type PostActionItem } from "./post-actions-menu";
 import { LikeButton } from "./like-button";
+import { BookmarkButton } from "./bookmark-button";
+import { ShareButton } from "./share-button";
 import { ReportBuzzSheet } from "./report-buzz-sheet";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
 import { useSetBuzzPostPinned } from "@/hooks/use-set-buzz-post-pinned";
-import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
+import { useTrackBuzzPostView } from "@/hooks/use-track-buzz-post-view";
+import { getInitials, formatRelativeTime, formatCompactCount, cn } from "@/lib/utils";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzPost } from "@/lib/queries/buzz";
 
@@ -39,9 +42,10 @@ export interface BuzzPostCardProps {
   isAuthorVerified?: boolean;
   authorVerificationLabel?: string | null;
   // Same batching principle as verification -- one useMyLikedPosts/
-  // useMyBuzzReports call per screen, not per-card.
+  // useMyBuzzReports/useMyBookmarkedPosts call per screen, not per-card.
   isLiked?: boolean;
   isReported?: boolean;
+  isBookmarked?: boolean;
 }
 
 export function BuzzPostCard({
@@ -53,6 +57,7 @@ export function BuzzPostCard({
   authorVerificationLabel = null,
   isLiked = false,
   isReported = false,
+  isBookmarked = false,
 }: BuzzPostCardProps) {
   const { user, profile, requireAuth } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -65,6 +70,13 @@ export function BuzzPostCard({
   // this post exists server-side yet: no detail page to link to, no
   // likes/replies/moderation/reporting possible until the real row lands.
   const isOptimistic = post.id.startsWith("optimistic-");
+
+  // Feed-context cards only -- the detail page renders this same card
+  // in-place (linkToDetail=false) for the parent post, which the brief
+  // scopes out ("IntersectionObserver ... per feed card").
+  const viewRef = useTrackBuzzPostView(post.id, post.authorId, {
+    enabled: linkToDetail && !isOptimistic,
+  });
 
   // moderate_buzz, not a blanket role === 'admin' check -- a sub-admin
   // without this permission gets no Pin/Delete-others'-post actions here,
@@ -131,7 +143,16 @@ export function BuzzPostCard({
               </Badge>
             )}
           </div>
-          <span className="text-caption text-ink-500">{formatRelativeTime(post.createdAt)}</span>
+          <span className="flex items-center gap-1 text-caption text-ink-500">
+            {formatRelativeTime(post.createdAt)}
+            {!isOptimistic && (
+              <>
+                <span aria-hidden="true">·</span>
+                <Eye className="size-3" strokeWidth={1.75} />
+                {formatCompactCount(post.viewCount)}
+              </>
+            )}
+          </span>
         </div>
       </div>
 
@@ -145,16 +166,18 @@ export function BuzzPostCard({
       )}
 
       <div className="flex items-center justify-between pt-1">
-        <span className="flex items-center gap-3 text-caption text-ink-500">
+        <span className="flex items-center gap-1 text-caption text-ink-500">
           {isOptimistic ? (
             "Posting…"
           ) : (
             <>
               <LikeButton postId={post.id} likeCount={post.likeCount} isLiked={isLiked} />
-              <span className="flex items-center gap-1">
+              <BookmarkButton postId={post.id} bookmarkCount={post.bookmarkCount} isBookmarked={isBookmarked} />
+              <span className="flex items-center gap-1 px-1">
                 <MessageCircle className="size-3.5" />
-                {post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}
+                {post.replyCount}
               </span>
+              <ShareButton postId={post.id} content={post.content} />
             </>
           )}
         </span>
@@ -193,6 +216,7 @@ export function BuzzPostCard({
 
   return (
     <motion.div
+      ref={viewRef}
       initial={animateIn ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: Math.min(index, 10) * 0.04, ease: [0.22, 1, 0.36, 1] }}

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Heart, LogOut, Pencil, ShieldCheck, Trash2, UserCircle2, Building2, ShoppingBag, CheckCircle2 } from "lucide-react";
+import { FileText, Heart, LogOut, Pencil, ShieldCheck, Trash2, UserCircle2, Building2, ShoppingBag, CheckCircle2, Bookmark } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { Skeleton, SkeletonLine, SkeletonRow } from "@/components/ui/skeleton";
 import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
 import { LegalLinksRow } from "@/components/legal/legal-links-row";
+import { BuzzPostCard } from "@/components/buzz/buzz-post-card";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { useMySubmissions } from "@/hooks/use-my-submissions";
@@ -20,6 +21,10 @@ import { useMyOwnedHostels } from "@/hooks/use-my-owned-hostels";
 import { useMyMarketListings } from "@/hooks/use-my-market-listings";
 import { useSetMarketListingStatus } from "@/hooks/use-set-market-listing-status";
 import { useDeleteMarketListing } from "@/hooks/use-delete-market-listing";
+import { useSavedBuzzPosts } from "@/hooks/use-saved-buzz-posts";
+import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
+import { useMyLikedPosts } from "@/hooks/use-my-liked-posts";
+import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
 import { LeavingCampusToggle } from "@/components/market/leaving-campus-toggle";
 import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
@@ -146,7 +151,7 @@ function MarketListingRow({ listing }: { listing: MarketListing }) {
   );
 }
 
-type ProfileListTab = "saved" | "submissions";
+type ProfileListTab = "saved" | "submissions" | "buzz";
 
 export default function ProfilePage() {
   const { user, profile, loading, requireAuth, signOut } = useAuth();
@@ -156,6 +161,21 @@ export default function ProfilePage() {
   const { data: submissions = [], isPending: submissionsPending } = useMySubmissions();
   const { data: ownedHostels = [], isPending: ownedPending } = useMyOwnedHostels();
   const { data: marketListings = [], isPending: marketListingsPending } = useMyMarketListings(user?.id);
+
+  // "Saved Posts" tab -- the signed-in user's own bookmarked Buzz posts.
+  // Strictly private to the viewer: moot here since Profile only ever
+  // renders the current user's own data (no public profile pages exist
+  // in this app), but scoped by userId via useSavedBuzzPosts regardless.
+  const savedBuzzQuery = useSavedBuzzPosts({ enabled: listTab === "buzz" });
+  const savedBuzzPosts = useMemo(
+    () => savedBuzzQuery.data?.pages.flatMap((page) => page.posts) ?? [],
+    [savedBuzzQuery.data]
+  );
+  const savedBuzzAuthorIds = useMemo(() => savedBuzzPosts.map((p) => p.authorId), [savedBuzzPosts]);
+  const savedBuzzPostIds = useMemo(() => savedBuzzPosts.map((p) => p.id), [savedBuzzPosts]);
+  const { data: savedBuzzVerifiedMap } = useVerifiedProfiles(savedBuzzAuthorIds);
+  const { data: savedBuzzLikedIds } = useMyLikedPosts(savedBuzzPostIds);
+  const { data: savedBuzzReports } = useMyBuzzReports();
 
   if (loading) {
     return (
@@ -254,12 +274,15 @@ export default function ProfilePage() {
       )}
 
       <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto">
           <button
             type="button"
-            onClick={() => setListTab("saved")}
+            onClick={(e) => {
+              setListTab("saved");
+              e.currentTarget.scrollIntoView({ inline: "end", block: "nearest" });
+            }}
             className={cn(
-              "rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
+              "shrink-0 rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
               listTab === "saved" ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
             )}
           >
@@ -267,13 +290,29 @@ export default function ProfilePage() {
           </button>
           <button
             type="button"
-            onClick={() => setListTab("submissions")}
+            onClick={(e) => {
+              setListTab("submissions");
+              e.currentTarget.scrollIntoView({ inline: "end", block: "nearest" });
+            }}
             className={cn(
-              "rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
+              "shrink-0 rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
               listTab === "submissions" ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
             )}
           >
             Submissions
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              setListTab("buzz");
+              e.currentTarget.scrollIntoView({ inline: "end", block: "nearest" });
+            }}
+            className={cn(
+              "shrink-0 rounded-pill px-3.5 py-1.5 text-body-sm font-medium transition-colors",
+              listTab === "buzz" ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
+            )}
+          >
+            Saved Posts
           </button>
         </div>
 
@@ -294,22 +333,60 @@ export default function ProfilePage() {
               ))}
             </div>
           )
-        ) : submissionsPending ? (
-          <div className="flex flex-col gap-2">
-            <SkeletonRow />
+        ) : listTab === "submissions" ? (
+          submissionsPending ? (
+            <div className="flex flex-col gap-2">
+              <SkeletonRow />
+            </div>
+          ) : submissions.length === 0 ? (
+            <EmptyState
+              icon={<FileText className="size-7" strokeWidth={1.75} />}
+              title="No submissions yet"
+              description="Once you submit a hostel, its review status shows up here."
+              className="bg-surface shadow-card"
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {submissions.map((submission) => (
+                <SubmissionRow key={submission.id} submission={submission} />
+              ))}
+            </div>
+          )
+        ) : savedBuzzQuery.isPending ? (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-32 w-full rounded-lg" />
           </div>
-        ) : submissions.length === 0 ? (
+        ) : savedBuzzPosts.length === 0 ? (
           <EmptyState
-            icon={<FileText className="size-7" strokeWidth={1.75} />}
-            title="No submissions yet"
-            description="Once you submit a hostel, its review status shows up here."
+            icon={<Bookmark className="size-7" strokeWidth={1.75} />}
+            title="No saved posts yet"
+            description="Tap the bookmark icon on any Buzz post to keep it here for later."
             className="bg-surface shadow-card"
           />
         ) : (
-          <div className="flex flex-col gap-2">
-            {submissions.map((submission) => (
-              <SubmissionRow key={submission.id} submission={submission} />
+          <div className="flex flex-col gap-3">
+            {savedBuzzPosts.map((post, i) => (
+              <BuzzPostCard
+                key={post.id}
+                post={post}
+                index={i}
+                isAuthorVerified={savedBuzzVerifiedMap?.has(post.authorId) ?? false}
+                authorVerificationLabel={savedBuzzVerifiedMap?.get(post.authorId) ?? null}
+                isLiked={savedBuzzLikedIds?.has(post.id) ?? false}
+                isReported={savedBuzzReports?.postIds.has(post.id) ?? false}
+                isBookmarked
+              />
             ))}
+            {savedBuzzQuery.hasNextPage && (
+              <Button
+                variant="secondary"
+                onClick={() => savedBuzzQuery.fetchNextPage()}
+                loading={savedBuzzQuery.isFetchingNextPage}
+              >
+                Show more
+              </Button>
+            )}
           </div>
         )}
       </section>
