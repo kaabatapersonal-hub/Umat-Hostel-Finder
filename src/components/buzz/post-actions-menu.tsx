@@ -8,6 +8,10 @@ export interface PostActionItem {
   label: string;
   onClick: () => void;
   destructive?: boolean;
+  // "Reported" after the caller has already filed one -- shown, not
+  // hidden, so the menu doesn't silently lose an item the user expects
+  // to still be there; tapping it does nothing.
+  disabled?: boolean;
 }
 
 // A minimal overflow menu -- there's no dropdown/popover primitive
@@ -57,15 +61,19 @@ export function PostActionsMenu({ actions }: { actions: PostActionItem[] }) {
             <button
               key={action.label}
               type="button"
+              disabled={action.disabled}
+              aria-disabled={action.disabled}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setOpen(false);
-                action.onClick();
+                if (!action.disabled) action.onClick();
               }}
               className={cn(
-                "block w-full whitespace-nowrap px-3 py-2 text-left text-body-sm hover:bg-surface-muted",
-                action.destructive ? "text-danger" : "text-ink-900"
+                "block w-full whitespace-nowrap px-3 py-2 text-left text-body-sm",
+                action.disabled
+                  ? "text-ink-300"
+                  : cn("hover:bg-surface-muted", action.destructive ? "text-danger" : "text-ink-900")
               )}
             >
               {action.label}

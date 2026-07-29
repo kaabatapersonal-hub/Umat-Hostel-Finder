@@ -7,8 +7,9 @@ import { MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
-import { PostActionsMenu } from "./post-actions-menu";
-import { ReactionPills } from "./reaction-pills";
+import { PostActionsMenu, type PostActionItem } from "./post-actions-menu";
+import { LikeButton } from "./like-button";
+import { ReportBuzzSheet } from "./report-buzz-sheet";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
 import { useSetBuzzPostPinned } from "@/hooks/use-set-buzz-post-pinned";
@@ -21,6 +22,7 @@ import type { BuzzPost } from "@/lib/queries/buzz";
 // measurement available before paint, so this is a length-based proxy for
 // "line-clamp-3 is probably cutting something off."
 const FEED_TRUNCATION_HINT_LENGTH = 220;
+const BUZZ_REPORT_JOIN_MESSAGE = "Join Campa to report a post";
 
 export interface BuzzPostCardProps {
   post: BuzzPost;
@@ -36,6 +38,10 @@ export interface BuzzPostCardProps {
   // use-verified-profiles.ts.
   isAuthorVerified?: boolean;
   authorVerificationLabel?: string | null;
+  // Same batching principle as verification -- one useMyLikedPosts/
+  // useMyBuzzReports call per screen, not per-card.
+  isLiked?: boolean;
+  isReported?: boolean;
 }
 
 export function BuzzPostCard({
@@ -45,16 +51,19 @@ export function BuzzPostCard({
   linkToDetail = true,
   isAuthorVerified = false,
   authorVerificationLabel = null,
+  isLiked = false,
+  isReported = false,
 }: BuzzPostCardProps) {
-  const { user, profile } = useAuth();
+  const { user, profile, requireAuth } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const deletePost = useDeleteBuzzPost();
   const setPinned = useSetBuzzPostPinned();
 
   // Tagged with this id prefix by useCreateBuzzPost's onMutate -- same
   // placeholder-id convention useToggleSave already uses. Nothing about
   // this post exists server-side yet: no detail page to link to, no
-  // reactions/replies/moderation possible until the real row lands.
+  // likes/replies/moderation/reporting possible until the real row lands.
   const isOptimistic = post.id.startsWith("optimistic-");
 
   // moderate_buzz, not a blanket role === 'admin' check -- a sub-admin
@@ -65,14 +74,27 @@ export function BuzzPostCard({
   const isOwn = !!user && user.id === post.authorId;
   const canModerate = !isOptimistic && (isOwn || canModerateBuzz);
 
-  const actions = canModerate
-    ? [
-        ...(canModerateBuzz
-          ? [{ label: post.isPinned ? "Unpin" : "Pin", onClick: () => setPinned.mutate({ postId: post.id, pinned: !post.isPinned }) }]
-          : []),
-        { label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) },
-      ]
-    : [];
+  const actions: PostActionItem[] = [];
+  if (canModerate) {
+    if (canModerateBuzz) {
+      actions.push({
+        label: post.isPinned ? "Unpin" : "Pin",
+        onClick: () => setPinned.mutate({ postId: post.id, pinned: !post.isPinned }),
+      });
+    }
+    actions.push({ label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) });
+  }
+  // Reporting your own post makes no sense -- excluded regardless of
+  // sign-in state, not just for the currently-signed-in user, since a
+  // signed-out visitor doesn't have an authorId to compare against anyway
+  // and requireAuth below is what actually gates the action.
+  if (!isOptimistic && !isOwn) {
+    actions.push({
+      label: isReported ? "Reported" : "Report",
+      disabled: isReported,
+      onClick: () => requireAuth(() => setReportOpen(true), { message: BUZZ_REPORT_JOIN_MESSAGE }),
+    });
+  }
 
   const cardBody = (
     <div
@@ -122,16 +144,17 @@ export function BuzzPostCard({
         <span className="-mt-1.5 text-caption font-medium text-brand-800">Show more</span>
       )}
 
-      {!isOptimistic && <ReactionPills postId={post.id} reactionCounts={post.reactionCounts} />}
-
       <div className="flex items-center justify-between pt-1">
-        <span className="flex items-center gap-1 text-caption text-ink-500">
+        <span className="flex items-center gap-3 text-caption text-ink-500">
           {isOptimistic ? (
             "Posting…"
           ) : (
             <>
-              <MessageCircle className="size-3.5" />
-              {post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}
+              <LikeButton postId={post.id} likeCount={post.likeCount} isLiked={isLiked} />
+              <span className="flex items-center gap-1">
+                <MessageCircle className="size-3.5" />
+                {post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}
+              </span>
             </>
           )}
         </span>
@@ -180,6 +203,9 @@ export function BuzzPostCard({
         </Link>
       ) : (
         cardBody
+      )}
+      {!isOptimistic && (
+        <ReportBuzzSheet open={reportOpen} onClose={() => setReportOpen(false)} postId={post.id} />
       )}
     </motion.div>
   );

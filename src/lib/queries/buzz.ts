@@ -1,12 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
-// Fixed set, not an open emoji picker -- fast to render, and the CHECK
-// constraint on buzz_reactions.emoji is the real enforcement; this is
-// just the UI's copy of the same 5 values.
-export const BUZZ_REACTION_EMOJIS = ["🔥", "👍", "😂", "💯", "👀"] as const;
-export type BuzzReactionEmoji = (typeof BUZZ_REACTION_EMOJIS)[number];
-
 export interface BuzzPost {
   id: string;
   authorId: string;
@@ -15,12 +9,12 @@ export interface BuzzPost {
   isAdminPost: boolean;
   isPinned: boolean;
   replyCount: number;
-  reactionCounts: Partial<Record<BuzzReactionEmoji, number>>;
+  likeCount: number;
   createdAt: string;
 }
 
 const BUZZ_POST_COLUMNS =
-  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, reaction_counts, created_at";
+  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, like_count, created_at";
 
 interface BuzzPostRow {
   id: string;
@@ -30,18 +24,8 @@ interface BuzzPostRow {
   is_admin_post: boolean;
   is_pinned: boolean;
   reply_count: number;
-  reaction_counts: unknown;
+  like_count: number;
   created_at: string;
-}
-
-function parseReactionCounts(value: unknown): Partial<Record<BuzzReactionEmoji, number>> {
-  if (!value || typeof value !== "object") return {};
-  const counts: Partial<Record<BuzzReactionEmoji, number>> = {};
-  for (const emoji of BUZZ_REACTION_EMOJIS) {
-    const count = (value as Record<string, unknown>)[emoji];
-    if (typeof count === "number" && count > 0) counts[emoji] = count;
-  }
-  return counts;
 }
 
 function mapBuzzPost(row: BuzzPostRow): BuzzPost {
@@ -53,7 +37,7 @@ function mapBuzzPost(row: BuzzPostRow): BuzzPost {
     isAdminPost: row.is_admin_post,
     isPinned: row.is_pinned,
     replyCount: row.reply_count,
-    reactionCounts: parseReactionCounts(row.reaction_counts),
+    likeCount: row.like_count,
     createdAt: row.created_at,
   };
 }
@@ -99,6 +83,44 @@ export async function getBuzzFeed(
   const posts = (data ?? []).map(mapBuzzPost);
   const last = posts[posts.length - 1];
   const nextCursor = posts.length === limit && last ? { createdAt: last.createdAt, id: last.id } : null;
+
+  return { posts, nextCursor };
+}
+
+export interface HotBuzzCursor {
+  score: number;
+  createdAt: string;
+  id: string;
+}
+
+export interface GetHotBuzzFeedResult {
+  posts: BuzzPost[];
+  nextCursor: HotBuzzCursor | null;
+}
+
+// Ranked by get_hot_buzz_posts' time-decay formula (see the migration for
+// the exact expression and the reasoning behind its tiebreak) -- a real
+// RPC, not a client-side sort, since the score depends on `now()` at query
+// time. Same cursor-pagination shape as getBuzzFeed, just keyed on
+// (score, createdAt, id) instead of (createdAt, id).
+export async function getHotBuzzFeed(
+  supabase: SupabaseClient<Database>,
+  { cursor, limit = BUZZ_PAGE_SIZE }: { cursor?: HotBuzzCursor | null; limit?: number } = {}
+): Promise<GetHotBuzzFeedResult> {
+  const { data, error } = await supabase.rpc("get_hot_buzz_posts", {
+    p_cursor_score: cursor?.score ?? null,
+    p_cursor_created_at: cursor?.createdAt ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    p_limit: limit,
+  });
+
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const posts = rows.map(mapBuzzPost);
+  const last = rows[rows.length - 1];
+  const nextCursor =
+    rows.length === limit && last ? { score: last.hot_score, createdAt: last.created_at, id: last.id } : null;
 
   return { posts, nextCursor };
 }
@@ -242,32 +264,171 @@ export async function deleteBuzzReply(supabase: SupabaseClient<Database>, replyI
   if (error) throw error;
 }
 
-// Adds the reaction if the caller hasn't reacted with this emoji on this
-// post yet, removes it if they have -- one round trip either way. Returns
-// the new state (true = now reacted) for optimistic-UI reconciliation.
-export async function toggleBuzzReaction(
-  supabase: SupabaseClient<Database>,
-  postId: string,
-  emoji: BuzzReactionEmoji
-): Promise<boolean> {
-  const { data, error } = await supabase.rpc("toggle_buzz_reaction", { p_post_id: postId, p_emoji: emoji });
+export async function likeBuzzPost(supabase: SupabaseClient<Database>, postId: string, userId: string): Promise<void> {
+  const { error } = await supabase.from("buzz_likes").insert({ post_id: postId, user_id: userId });
   if (error) throw error;
-  return data;
 }
 
-// The caller's own reactions on one post -- lets the UI highlight which
-// pills are "mine" without needing every other reactor's identity.
-export async function getMyReactionsForPost(
+export async function unlikeBuzzPost(supabase: SupabaseClient<Database>, postId: string, userId: string): Promise<void> {
+  const { error } = await supabase.from("buzz_likes").delete().eq("post_id", postId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+// Batched (one query for every post currently on screen), not one query
+// per card -- same shape as get_verified_profiles/useVerifiedProfiles,
+// which this same feed already calls the same way.
+export async function getMyLikedPostIds(
   supabase: SupabaseClient<Database>,
-  postId: string,
+  postIds: string[],
   userId: string
-): Promise<BuzzReactionEmoji[]> {
-  const { data, error } = await supabase
-    .from("buzz_reactions")
-    .select("emoji")
-    .eq("post_id", postId)
-    .eq("author_id", userId);
+): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+
+  const { data, error } = await supabase.from("buzz_likes").select("post_id").eq("user_id", userId).in("post_id", postIds);
 
   if (error) throw error;
-  return (data ?? []).map((row) => row.emoji as BuzzReactionEmoji);
+  return new Set((data ?? []).map((row) => row.post_id));
+}
+
+export type BuzzReportReason = "inappropriate" | "spam" | "harassment" | "other";
+export type BuzzReportStatus = "pending" | "reviewed" | "dismissed";
+
+export async function reportBuzzItem(
+  supabase: SupabaseClient<Database>,
+  {
+    reporterId,
+    postId,
+    replyId,
+    reason,
+    details,
+  }: { reporterId: string; postId?: string | null; replyId?: string | null; reason: BuzzReportReason; details?: string | null }
+): Promise<void> {
+  const { error } = await supabase.from("buzz_reports").insert({
+    reporter_id: reporterId,
+    post_id: postId ?? null,
+    reply_id: replyId ?? null,
+    reason,
+    details: details?.trim() || null,
+  });
+  if (error) throw error;
+}
+
+// Every report the caller has ever filed, split into two id sets -- lets
+// the UI show "Reported" on any post/reply they've already flagged
+// without a separate round trip per card. RLS only ever returns the
+// caller's own rows here (or every row, for a moderator) -- see the
+// migration's buzz_reports_select_own_or_moderator policy.
+export interface MyBuzzReports {
+  postIds: Set<string>;
+  replyIds: Set<string>;
+}
+
+export async function getMyBuzzReports(supabase: SupabaseClient<Database>, userId: string): Promise<MyBuzzReports> {
+  const { data, error } = await supabase.from("buzz_reports").select("post_id, reply_id").eq("reporter_id", userId);
+  if (error) throw error;
+
+  const postIds = new Set<string>();
+  const replyIds = new Set<string>();
+  for (const row of data ?? []) {
+    if (row.post_id) postIds.add(row.post_id);
+    if (row.reply_id) replyIds.add(row.reply_id);
+  }
+  return { postIds, replyIds };
+}
+
+export interface AdminBuzzReportRow {
+  id: string;
+  reporterId: string;
+  reporterName: string | null;
+  reason: BuzzReportReason;
+  details: string | null;
+  status: BuzzReportStatus;
+  createdAt: string;
+  targetType: "post" | "reply";
+  // The post to navigate to either way -- the reported post itself, or
+  // (for a reply report) the reply's parent post, so "View post" always
+  // lands somewhere with the reported content visible in context.
+  targetPostId: string | null;
+  targetPreview: string;
+}
+
+// Admin-only screen, so this can read profiles/buzz_posts/buzz_replies
+// directly (admins already have blanket read access to profiles; the
+// other two tables are fully public-read) rather than needing a
+// denormalized reporter name the way public-facing author_name is.
+export async function getAdminBuzzReports(
+  supabase: SupabaseClient<Database>,
+  { status = "pending" }: { status?: BuzzReportStatus } = {}
+): Promise<AdminBuzzReportRow[]> {
+  const { data: reports, error } = await supabase
+    .from("buzz_reports")
+    .select("id, reporter_id, post_id, reply_id, reason, details, status, created_at")
+    .eq("status", status)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  if (!reports || reports.length === 0) return [];
+
+  const reporterIds = [...new Set(reports.map((r) => r.reporter_id))];
+  const postIds = [...new Set(reports.filter((r) => r.post_id).map((r) => r.post_id as string))];
+  const replyIds = [...new Set(reports.filter((r) => r.reply_id).map((r) => r.reply_id as string))];
+
+  const [profilesRes, postsRes, repliesRes] = await Promise.all([
+    reporterIds.length ? supabase.from("profiles").select("id, full_name").in("id", reporterIds) : Promise.resolve({ data: [], error: null }),
+    postIds.length ? supabase.from("buzz_posts").select("id, content").in("id", postIds) : Promise.resolve({ data: [], error: null }),
+    replyIds.length
+      ? supabase.from("buzz_replies").select("id, post_id, content, gif_url").in("id", replyIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (profilesRes.error) throw profilesRes.error;
+  if (postsRes.error) throw postsRes.error;
+  if (repliesRes.error) throw repliesRes.error;
+
+  const nameById = new Map((profilesRes.data ?? []).map((p) => [p.id, p.full_name as string | null]));
+  const postContentById = new Map((postsRes.data ?? []).map((p) => [p.id as string, p.content as string]));
+  const replyById = new Map(
+    (repliesRes.data ?? []).map((r) => [
+      r.id as string,
+      { postId: r.post_id as string, content: r.content as string, gifUrl: r.gif_url as string | null },
+    ])
+  );
+
+  return reports.map((r) => {
+    const isPost = !!r.post_id;
+    const reply = r.reply_id ? replyById.get(r.reply_id) : undefined;
+
+    return {
+      id: r.id,
+      reporterId: r.reporter_id,
+      reporterName: nameById.get(r.reporter_id) ?? null,
+      reason: r.reason as BuzzReportReason,
+      details: r.details,
+      status: r.status as BuzzReportStatus,
+      createdAt: r.created_at,
+      targetType: isPost ? "post" : "reply",
+      targetPostId: isPost ? (r.post_id as string) : (reply?.postId ?? null),
+      targetPreview: isPost
+        ? (postContentById.get(r.post_id as string) ?? "(post deleted)")
+        : reply
+          ? reply.gifUrl
+            ? "[GIF reply]"
+            : reply.content
+          : "(reply deleted)",
+    };
+  });
+}
+
+export async function getPendingBuzzReportsCount(supabase: SupabaseClient<Database>): Promise<number> {
+  const { count, error } = await supabase.from("buzz_reports").select("*", { count: "exact", head: true }).eq("status", "pending");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function resolveBuzzReport(
+  supabase: SupabaseClient<Database>,
+  reportId: string,
+  action: "dismiss" | "delete"
+): Promise<void> {
+  const { error } = await supabase.rpc("resolve_buzz_report", { p_report_id: reportId, p_action: action });
+  if (error) throw error;
 }

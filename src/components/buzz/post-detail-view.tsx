@@ -15,6 +15,8 @@ import { useBuzzReplies } from "@/hooks/use-buzz-replies";
 import { useCreateBuzzReply } from "@/hooks/use-create-buzz-reply";
 import { useKeyboardInset, useIsKeyboardOpen } from "@/hooks/use-keyboard-inset";
 import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
+import { useMyLikedPosts } from "@/hooks/use-my-liked-posts";
+import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
 import type { GifResult } from "@/lib/queries/gifs";
 
 const REPLY_MIN_LENGTH = 2;
@@ -41,6 +43,8 @@ export function PostDetailView({ postId }: { postId: string }) {
     [post, replies]
   );
   const { data: verifiedMap } = useVerifiedProfiles(authorIds);
+  const { data: likedPostIds } = useMyLikedPosts(post ? [post.id] : []);
+  const { data: myReports } = useMyBuzzReports();
 
   // The user may have scrolled up to read older replies before tapping the
   // input -- once the keyboard actually opens (not on focus, which fires
@@ -101,6 +105,8 @@ export function PostDetailView({ postId }: { postId: string }) {
             linkToDetail={false}
             isAuthorVerified={verifiedMap?.has(post.authorId) ?? false}
             authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
+            isLiked={likedPostIds?.has(post.id) ?? false}
+            isReported={myReports?.postIds.has(post.id) ?? false}
           />
 
           <h2 className="font-display text-h1 text-ink-900">Replies ({post.replyCount})</h2>
@@ -120,6 +126,7 @@ export function PostDetailView({ postId }: { postId: string }) {
                   reply={reply}
                   isAuthorVerified={verifiedMap?.has(reply.authorId) ?? false}
                   authorVerificationLabel={verifiedMap?.get(reply.authorId) ?? null}
+                  isReported={myReports?.replyIds.has(reply.id) ?? false}
                 />
               ))}
               <div ref={repliesEndRef} aria-hidden />

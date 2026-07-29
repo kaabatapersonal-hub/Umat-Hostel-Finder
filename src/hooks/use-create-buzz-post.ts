@@ -60,7 +60,7 @@ export function useCreateBuzzPost() {
         isAdminPost: profile?.role === "admin",
         isPinned: false,
         replyCount: 0,
-        reactionCounts: {},
+        likeCount: 0,
         createdAt: new Date().toISOString(),
       };
 
@@ -70,19 +70,37 @@ export function useCreateBuzzPost() {
 
       return { previous, tempId };
     },
-    onError: (_err, content, context) => {
+    onError: (err, content, context) => {
       if (context?.previous) queryClient.setQueryData(["buzz-feed"], context.previous);
-      showToast({
-        message: "Couldn't post — try again?",
-        variant: "error",
-        actionLabel: "Retry",
-        onAction: () => mutationRef.current?.mutate(content),
-      });
+
+      // The server-side rate limit (enforce_buzz_post_rate_limit,
+      // Buzz v2) is the one failure mode where "Retry" would just fail
+      // again immediately -- it's not a transient error, so it gets its
+      // own friendlier copy and no retry action, instead of the generic
+      // network-failure toast every other error gets.
+      const message = err instanceof Error ? err.message : "";
+      const isRateLimited = message.includes("Rate limit");
+
+      showToast(
+        isRateLimited
+          ? { message: "You're posting a lot! Try again in a bit.", variant: "error" }
+          : {
+              message: "Couldn't post — try again?",
+              variant: "error",
+              actionLabel: "Retry",
+              onAction: () => mutationRef.current?.mutate(content),
+            }
+      );
     },
     onSuccess: (newPost, _content, context) => {
       queryClient.setQueryData<BuzzFeedCache>(["buzz-feed"], (old) =>
         replaceFirstPagePosts(old, (posts) => posts.map((p) => (p.id === context?.tempId ? newPost : p)))
       );
+      // Hot's own ranking is server-computed (time-decay), so the new
+      // post isn't spliced in directly the way the New feed's cache is --
+      // just invalidate so it refetches into whatever position it
+      // actually scores once confirmed.
+      queryClient.invalidateQueries({ queryKey: ["buzz-feed-hot"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       captureEvent("posted_buzz", { post_id: newPost.id });
     },

@@ -2,10 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, PlusCircle, FileClock, PenLine, Flag, Users, ShoppingBag, ArrowLeft, ShieldAlert, BarChart3 } from "lucide-react";
+import {
+  LayoutDashboard,
+  Building2,
+  PlusCircle,
+  FileClock,
+  PenLine,
+  Flag,
+  MessageSquareWarning,
+  Users,
+  ShoppingBag,
+  ArrowLeft,
+  ShieldAlert,
+  BarChart3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { hasAdminPermission } from "@/lib/admin-permissions";
+import { usePendingBuzzReportsCount } from "@/hooks/use-pending-buzz-reports-count";
 import type { AdminPermission } from "@/lib/supabase/database.types";
 
 interface AdminTab {
@@ -27,6 +41,7 @@ const TABS: AdminTab[] = [
   { href: "/admin/submissions", label: "Submissions", icon: FileClock, permission: "manage_hostels" },
   { href: "/admin/edit-requests", label: "Edit Requests", icon: PenLine, permission: "manage_hostels" },
   { href: "/admin/moderation", label: "Moderation", icon: Flag, permission: "moderate_reviews" },
+  { href: "/admin/reports", label: "Reports", icon: MessageSquareWarning, permission: "moderate_buzz" },
   { href: "/admin/users", label: "Users", icon: Users, permission: "manage_users" },
   { href: "/admin/market", label: "Market", icon: ShoppingBag, permission: "moderate_market" },
 ];
@@ -45,6 +60,7 @@ function isTabActive(href: string, pathname: string): boolean {
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { profile } = useAuth();
+  const { data: pendingReportsCount } = usePendingBuzzReportsCount();
 
   const visibleTabs = TABS.filter((tab) => !tab.permission || hasAdminPermission(profile, tab.permission));
 
@@ -73,6 +89,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <nav className="mx-auto mt-3 flex max-w-5xl gap-1 overflow-x-auto">
           {visibleTabs.map(({ href, label, icon: Icon }) => {
             const active = isTabActive(href, pathname);
+            const showReportsBadge = href === "/admin/reports" && !!pendingReportsCount;
             return (
               <Link
                 key={href}
@@ -84,6 +101,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <Icon className="size-4" />
                 {label}
+                {showReportsBadge && (
+                  <span
+                    className={cn(
+                      "flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-[10px] font-semibold",
+                      active ? "bg-white text-brand-800" : "bg-danger text-white"
+                    )}
+                  >
+                    {pendingReportsCount}
+                  </span>
+                )}
               </Link>
             );
           })}

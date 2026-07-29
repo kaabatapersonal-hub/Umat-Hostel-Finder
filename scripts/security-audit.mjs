@@ -1117,99 +1117,277 @@ async function main() {
   }
 
   // =====================================================================
-  // buzz_reactions (Session 21 Part 2)
+  // buzz_likes (Buzz v2 -- replaces the 5-emoji buzz_reactions)
   // =====================================================================
-  section("buzz: reactions (Session 21)");
+  section("buzz: likes (Buzz v2)");
   {
-    const reactionPost = await post(
+    const likePost = await post(
       strangerToken,
       "/buzz_posts",
-      { author_id: strangerUid, content: "[Buzz Audit] Reactions test post" },
+      { author_id: strangerUid, content: "[Buzz Audit] Likes test post" },
       "return=representation"
     );
-    const reactionPostId = reactionPost.body?.[0]?.id;
+    const likePostId = likePost.body?.[0]?.id;
 
-    const anonToggle = await rpc(null, "toggle_buzz_reaction", { p_post_id: reactionPostId, p_emoji: "🔥" });
-    check("anon cannot call toggle_buzz_reaction (not granted to anon)", !anonToggle.ok, `status ${anonToggle.status}`);
+    const anonDirectInsert = await post(null, "/buzz_likes", { post_id: likePostId, user_id: strangerUid });
+    check("anon cannot insert a like directly", !anonDirectInsert.ok, `status ${anonDirectInsert.status}`);
 
-    const firstToggle = await rpc(strangerToken, "toggle_buzz_reaction", { p_post_id: reactionPostId, p_emoji: "🔥" });
-    check("toggle_buzz_reaction adds a reaction and returns true", firstToggle.ok && firstToggle.body === true, JSON.stringify(firstToggle.body));
+    const firstLike = await post(strangerToken, "/buzz_likes", { post_id: likePostId, user_id: strangerUid }, "return=representation");
+    check("stranger can like a post", firstLike.ok, JSON.stringify(firstLike.body));
 
-    const countsAfterAdd = await get(adminToken, `/buzz_posts?id=eq.${reactionPostId}&select=reaction_counts`);
+    const countAfterLike = await get(adminToken, `/buzz_posts?id=eq.${likePostId}&select=like_count`);
+    check("like_count reflects the new like", countAfterLike.body?.[0]?.like_count === 1, JSON.stringify(countAfterLike.body));
+
+    const unlike = await del(strangerToken, `/buzz_likes?post_id=eq.${likePostId}&user_id=eq.${strangerUid}`);
+    check("stranger can unlike (delete their own like)", unlike.ok, `status ${unlike.status}`);
+
+    const countAfterUnlike = await get(adminToken, `/buzz_posts?id=eq.${likePostId}&select=like_count`);
+    check("like_count drops back to 0 after unliking", countAfterUnlike.body?.[0]?.like_count === 0, JSON.stringify(countAfterUnlike.body));
+
+    const spoofLikeUser = await post(strangerToken, "/buzz_likes", { post_id: likePostId, user_id: admin.user.id });
+    check("stranger cannot spoof user_id on a like", !spoofLikeUser.ok, `status ${spoofLikeUser.status}`);
+
+    const realLike = await post(strangerToken, "/buzz_likes", { post_id: likePostId, user_id: strangerUid }, "return=representation");
+    const duplicateLike = await post(strangerToken, "/buzz_likes", { post_id: likePostId, user_id: strangerUid });
     check(
-      "reaction_counts reflects the new reaction",
-      countsAfterAdd.body?.[0]?.reaction_counts?.["🔥"] === 1,
-      JSON.stringify(countsAfterAdd.body)
-    );
-
-    const secondToggle = await rpc(strangerToken, "toggle_buzz_reaction", { p_post_id: reactionPostId, p_emoji: "🔥" });
-    check("toggling the same emoji again removes it and returns false", secondToggle.ok && secondToggle.body === false, JSON.stringify(secondToggle.body));
-
-    const countsAfterRemove = await get(adminToken, `/buzz_posts?id=eq.${reactionPostId}&select=reaction_counts`);
-    check(
-      "reaction_counts drops back to 0/absent after removal",
-      !countsAfterRemove.body?.[0]?.reaction_counts?.["🔥"],
-      JSON.stringify(countsAfterRemove.body)
-    );
-
-    const anonDirectInsert = await post(null, "/buzz_reactions", { post_id: reactionPostId, author_id: strangerUid, emoji: "👍" });
-    check("anon cannot insert a reaction directly", !anonDirectInsert.ok, `status ${anonDirectInsert.status}`);
-
-    const spoofReactionAuthor = await post(strangerToken, "/buzz_reactions", {
-      post_id: reactionPostId,
-      author_id: admin.user.id,
-      emoji: "👍",
-    });
-    check("stranger cannot spoof author_id on a reaction", !spoofReactionAuthor.ok, `status ${spoofReactionAuthor.status}`);
-
-    const badEmoji = await post(strangerToken, "/buzz_reactions", { post_id: reactionPostId, author_id: strangerUid, emoji: "🐸" });
-    check("an emoji outside the fixed set is rejected (CHECK constraint)", !badEmoji.ok, `status ${badEmoji.status}`);
-
-    const realReaction = await post(
-      strangerToken,
-      "/buzz_reactions",
-      { post_id: reactionPostId, author_id: strangerUid, emoji: "👍" },
-      "return=representation"
-    );
-    const duplicateReaction = await post(strangerToken, "/buzz_reactions", {
-      post_id: reactionPostId,
-      author_id: strangerUid,
-      emoji: "👍",
-    });
-    check(
-      "the same user reacting with the same emoji twice is rejected (unique constraint)",
-      realReaction.ok && !duplicateReaction.ok,
-      `status ${duplicateReaction.status}`
+      "the same user liking the same post twice is rejected (unique constraint)",
+      realLike.ok && !duplicateLike.ok,
+      `status ${duplicateLike.status}`
     );
 
     if (hasDistinctOwner) {
-      const otherDeletesReaction = await del(ownerToken, `/buzz_reactions?post_id=eq.${reactionPostId}&author_id=eq.${strangerUid}&emoji=eq.${encodeURIComponent("👍")}`);
-      const reactionStillExists = await get(adminToken, `/buzz_reactions?post_id=eq.${reactionPostId}&author_id=eq.${strangerUid}&emoji=eq.${encodeURIComponent("👍")}&select=id`);
-      check(
-        "a different user cannot delete someone else's reaction",
-        reactionStillExists.body?.length === 1,
-        JSON.stringify(reactionStillExists.body)
-      );
+      const otherDeletesLike = await del(ownerToken, `/buzz_likes?post_id=eq.${likePostId}&user_id=eq.${strangerUid}`);
+      const likeStillExists = await get(adminToken, `/buzz_likes?post_id=eq.${likePostId}&user_id=eq.${strangerUid}&select=id`);
+      check("a different user cannot delete someone else's like", likeStillExists.body?.length === 1, JSON.stringify(likeStillExists.body));
     } else {
-      skip("a different user cannot delete someone else's reaction", "owner account not confirmed -- no second distinct identity available");
+      skip("a different user cannot delete someone else's like", "owner account not confirmed -- no second distinct identity available");
     }
 
-    // Suspend enforcement, extended to reactions.
+    // Suspend enforcement, extended to likes (same as reactions before them).
     await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
-    const suspendedReactionAttempt = await post(strangerToken, "/buzz_reactions", {
-      post_id: reactionPostId,
-      author_id: strangerUid,
-      emoji: "😂",
-    });
-    check(
-      "a suspended account's existing session cannot add a reaction",
-      !suspendedReactionAttempt.ok,
-      `status ${suspendedReactionAttempt.status}`
-    );
+    const suspendedLikeAttempt = await post(strangerToken, "/buzz_likes", { post_id: likePostId, user_id: strangerUid });
+    check("a suspended account's existing session cannot like a post", !suspendedLikeAttempt.ok, `status ${suspendedLikeAttempt.status}`);
     await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
 
     // Cleanup.
-    if (reactionPostId) await del(adminToken, `/buzz_posts?id=eq.${reactionPostId}`);
+    await del(adminToken, `/buzz_likes?post_id=eq.${likePostId}`);
+    if (likePostId) await del(adminToken, `/buzz_posts?id=eq.${likePostId}`);
+  }
+
+  // =====================================================================
+  // Hot feed ranking (Buzz v2)
+  // =====================================================================
+  section("buzz: hot feed (Buzz v2)");
+  {
+    const anonHot = await rpc(null, "get_hot_buzz_posts", { p_limit: 5 });
+    check("anon can call get_hot_buzz_posts (public feed sort)", anonHot.ok, `status ${anonHot.status}`);
+
+    const hotPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Hot feed test post" },
+      "return=representation"
+    );
+    const hotPostId = hotPost.body?.[0]?.id;
+    await post(strangerToken, "/buzz_likes", { post_id: hotPostId, user_id: strangerUid });
+
+    const hotResult = await rpc(adminToken, "get_hot_buzz_posts", { p_limit: 50 });
+    const foundInHot = (hotResult.body ?? []).find((row) => row.id === hotPostId);
+    check(
+      "a liked post appears in get_hot_buzz_posts with a positive hot_score",
+      hotResult.ok && !!foundInHot && foundInHot.hot_score > 0,
+      JSON.stringify(foundInHot)
+    );
+
+    // Cleanup.
+    await del(adminToken, `/buzz_likes?post_id=eq.${hotPostId}`);
+    if (hotPostId) await del(adminToken, `/buzz_posts?id=eq.${hotPostId}`);
+  }
+
+  // =====================================================================
+  // Report system (Buzz v2)
+  // =====================================================================
+  section("buzz: reports (Buzz v2)");
+  {
+    const reportTestPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Report test post" },
+      "return=representation"
+    );
+    const reportTestPostId = reportTestPost.body?.[0]?.id;
+
+    const anonReport = await post(null, "/buzz_reports", { reporter_id: strangerUid, post_id: reportTestPostId, reason: "spam" });
+    check("anon cannot insert a report", !anonReport.ok, `status ${anonReport.status}`);
+
+    const bothTargets = await post(strangerToken, "/buzz_reports", {
+      reporter_id: strangerUid,
+      post_id: reportTestPostId,
+      reply_id: reportTestPostId,
+      reason: "spam",
+    });
+    check("a report with both post_id and reply_id is rejected (CHECK constraint)", !bothTargets.ok, `status ${bothTargets.status}`);
+
+    const neitherTarget = await post(
+      strangerToken,
+      "/buzz_reports",
+      { reporter_id: strangerUid, reason: "spam" },
+      "return=representation"
+    );
+    check("a report with neither post_id nor reply_id is rejected (RLS insert check)", !neitherTarget.ok, `status ${neitherTarget.status}`);
+    // Defensive cleanup: if this regresses and the insert unexpectedly
+    // succeeds again, don't leave a stray row sitting in the live
+    // moderation queue the way one already did once (caught by
+    // inspection, not by this script -- there's no delete path for
+    // buzz_reports at all by design, so "dismiss" is the only available
+    // cleanup, same as a real moderator would do).
+    const strayReportId = neitherTarget.body?.[0]?.id;
+    if (strayReportId) await rpc(adminToken, "resolve_buzz_report", { p_report_id: strayReportId, p_action: "dismiss" });
+
+    const realReport = await post(
+      strangerToken,
+      "/buzz_reports",
+      { reporter_id: strangerUid, post_id: reportTestPostId, reason: "spam" },
+      "return=representation"
+    );
+    check("stranger can report a post", realReport.ok, JSON.stringify(realReport.body));
+    const reportId = realReport.body?.[0]?.id;
+
+    const duplicateReport = await post(strangerToken, "/buzz_reports", {
+      reporter_id: strangerUid,
+      post_id: reportTestPostId,
+      reason: "harassment",
+    });
+    check(
+      "the same user reporting the same post twice is rejected (unique constraint)",
+      !duplicateReport.ok,
+      `status ${duplicateReport.status}`
+    );
+
+    const spoofReporter = await post(strangerToken, "/buzz_reports", {
+      reporter_id: admin.user.id,
+      post_id: reportTestPostId,
+      reason: "spam",
+    });
+    check("stranger cannot spoof reporter_id on a report", !spoofReporter.ok, `status ${spoofReporter.status}`);
+
+    const reporterReadsOwn = await get(strangerToken, `/buzz_reports?id=eq.${reportId}&select=id`);
+    check("the reporter CAN read their own report", reporterReadsOwn.body?.length === 1, JSON.stringify(reporterReadsOwn.body));
+
+    if (hasDistinctOwner) {
+      const otherReadsReport = await get(ownerToken, `/buzz_reports?id=eq.${reportId}&select=id`);
+      check("a different non-admin cannot read someone else's report", (otherReadsReport.body ?? []).length === 0, JSON.stringify(otherReadsReport.body));
+    } else {
+      skip("a different non-admin cannot read someone else's report", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const adminReadsReport = await get(adminToken, `/buzz_reports?id=eq.${reportId}&select=id,status`);
+    check("admin (moderate_buzz) CAN read the report", adminReadsReport.body?.length === 1, JSON.stringify(adminReadsReport.body));
+
+    const strangerResolves = await rpc(strangerToken, "resolve_buzz_report", { p_report_id: reportId, p_action: "dismiss" });
+    check("non-admin cannot call resolve_buzz_report", !strangerResolves.ok, JSON.stringify(strangerResolves.body));
+
+    const badAction = await rpc(adminToken, "resolve_buzz_report", { p_report_id: reportId, p_action: "not_a_real_action" });
+    check("resolve_buzz_report rejects an unknown action", !badAction.ok, JSON.stringify(badAction.body));
+
+    const dismissResult = await rpc(adminToken, "resolve_buzz_report", { p_report_id: reportId, p_action: "dismiss" });
+    const afterDismiss = await get(adminToken, `/buzz_reports?id=eq.${reportId}&select=status`);
+    check(
+      "admin CAN dismiss a report, and its status becomes 'dismissed'",
+      dismissResult.ok && afterDismiss.body?.[0]?.status === "dismissed",
+      JSON.stringify(afterDismiss.body)
+    );
+
+    // A second report, resolved via "delete" -- confirms the RPC is
+    // atomic: the reported post is actually gone AND the report itself
+    // is marked 'reviewed', not left half-resolved either way.
+    const deleteTestPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Report-delete test post" },
+      "return=representation"
+    );
+    const deleteTestPostId = deleteTestPost.body?.[0]?.id;
+    const secondReport = await post(
+      strangerToken,
+      "/buzz_reports",
+      { reporter_id: strangerUid, post_id: deleteTestPostId, reason: "harassment" },
+      "return=representation"
+    );
+    const secondReportId = secondReport.body?.[0]?.id;
+
+    const deleteResult = await rpc(adminToken, "resolve_buzz_report", { p_report_id: secondReportId, p_action: "delete" });
+    const postAfterResolve = await get(adminToken, `/buzz_posts?id=eq.${deleteTestPostId}&select=id`);
+    const reportAfterResolve = await get(adminToken, `/buzz_reports?id=eq.${secondReportId}&select=status`);
+    check(
+      "admin CAN resolve a report with 'delete' -- the post is gone and the report is 'reviewed'",
+      deleteResult.ok && (postAfterResolve.body ?? []).length === 0 && reportAfterResolve.body?.[0]?.status === "reviewed",
+      JSON.stringify({ post: postAfterResolve.body, report: reportAfterResolve.body })
+    );
+
+    // Suspend enforcement, extended to reports.
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
+    const suspendedReportAttempt = await post(strangerToken, "/buzz_reports", {
+      reporter_id: strangerUid,
+      post_id: reportTestPostId,
+      reason: "other",
+    });
+    check("a suspended account's existing session cannot file a report", !suspendedReportAttempt.ok, `status ${suspendedReportAttempt.status}`);
+    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
+
+    // Cleanup (deleteTestPost/secondReport already resolved away above).
+    await del(adminToken, `/buzz_reports?id=eq.${reportId}`);
+    if (reportTestPostId) await del(adminToken, `/buzz_posts?id=eq.${reportTestPostId}`);
+  }
+
+  // =====================================================================
+  // Server-side post rate limiting (Buzz v2) -- posts only, not replies.
+  // =====================================================================
+  section("buzz: rate limiting (Buzz v2)");
+  {
+    const rateLimitPostIds = [];
+    let hitLimitEarly = false;
+    for (let i = 0; i < 10; i++) {
+      const created = await post(
+        strangerToken,
+        "/buzz_posts",
+        { author_id: strangerUid, content: `[Buzz Audit] Rate limit test post ${i}` },
+        "return=representation"
+      );
+      if (created.ok) {
+        rateLimitPostIds.push(created.body?.[0]?.id);
+      } else {
+        hitLimitEarly = true;
+      }
+    }
+    check(
+      "10 posts within an hour are all accepted (at the limit, not over it)",
+      rateLimitPostIds.length === 10 && !hitLimitEarly,
+      `created ${rateLimitPostIds.length}/10`
+    );
+
+    const eleventhPost = await post(strangerToken, "/buzz_posts", {
+      author_id: strangerUid,
+      content: "[Buzz Audit] Rate limit test post 11 -- should be rejected",
+    });
+    check("an 11th post within the same hour is rejected (rate limit trigger)", !eleventhPost.ok, `status ${eleventhPost.status}`);
+
+    // Replies are explicitly NOT rate-limited -- a reply on one of the 10
+    // posts above must still succeed even though the author is at the
+    // post limit.
+    const replyDespiteLimit = await post(strangerToken, "/buzz_replies", {
+      post_id: rateLimitPostIds[0],
+      author_id: strangerUid,
+      content: "Replies aren't rate-limited",
+    });
+    check("replies are not subject to the post rate limit", replyDespiteLimit.ok, JSON.stringify(replyDespiteLimit.body));
+
+    // Cleanup -- delete every test post created in this section so the
+    // next section (and any real usage) starts from a clean rolling
+    // window again (deleted rows don't count toward the trigger's count).
+    for (const id of rateLimitPostIds) {
+      if (id) await del(adminToken, `/buzz_posts?id=eq.${id}`);
+    }
   }
 
   // =====================================================================

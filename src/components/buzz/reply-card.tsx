@@ -4,31 +4,46 @@ import { useState } from "react";
 import Image from "next/image";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
-import { PostActionsMenu } from "./post-actions-menu";
+import { PostActionsMenu, type PostActionItem } from "./post-actions-menu";
+import { ReportBuzzSheet } from "./report-buzz-sheet";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzReply } from "@/hooks/use-delete-buzz-reply";
 import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzReply } from "@/lib/queries/buzz";
 
+const BUZZ_REPORT_JOIN_MESSAGE = "Join Campa to report a reply";
+
 export interface ReplyCardProps {
   reply: BuzzReply;
   isAuthorVerified?: boolean;
   authorVerificationLabel?: string | null;
+  isReported?: boolean;
 }
 
-export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationLabel = null }: ReplyCardProps) {
-  const { user, profile } = useAuth();
+export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationLabel = null, isReported = false }: ReplyCardProps) {
+  const { user, profile, requireAuth } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const deleteReply = useDeleteBuzzReply(reply.postId);
 
-  // Tagged by useCreateBuzzReply's onMutate -- nothing to moderate yet,
-  // same reasoning as BuzzPostCard's isOptimistic.
+  // Tagged by useCreateBuzzReply's onMutate -- nothing to moderate/report
+  // yet, same reasoning as BuzzPostCard's isOptimistic.
   const isOptimistic = reply.id.startsWith("optimistic-");
   const isOwn = !!user && user.id === reply.authorId;
   const canModerate = !isOptimistic && (isOwn || hasAdminPermission(profile, "moderate_buzz"));
 
-  const actions = canModerate ? [{ label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) }] : [];
+  const actions: PostActionItem[] = [];
+  if (canModerate) {
+    actions.push({ label: "Delete", destructive: true, onClick: () => setConfirmingDelete(true) });
+  }
+  if (!isOptimistic && !isOwn) {
+    actions.push({
+      label: isReported ? "Reported" : "Report",
+      disabled: isReported,
+      onClick: () => requireAuth(() => setReportOpen(true), { message: BUZZ_REPORT_JOIN_MESSAGE }),
+    });
+  }
 
   return (
     <div className={cn("flex items-start gap-2.5 rounded-md bg-surface-muted p-3", isOptimistic && "opacity-60")}>
@@ -60,6 +75,9 @@ export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationL
         )}
       </div>
       {!confirmingDelete && <PostActionsMenu actions={actions} />}
+      {!isOptimistic && (
+        <ReportBuzzSheet open={reportOpen} onClose={() => setReportOpen(false)} replyId={reply.id} />
+      )}
     </div>
   );
 }

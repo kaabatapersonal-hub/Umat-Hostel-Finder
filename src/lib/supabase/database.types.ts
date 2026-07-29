@@ -507,7 +507,7 @@ export interface Database {
           is_admin_post: boolean;
           is_pinned: boolean;
           reply_count: number;
-          reaction_counts: Json;
+          like_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -519,7 +519,7 @@ export interface Database {
           is_admin_post?: boolean;
           is_pinned?: boolean;
           reply_count?: number;
-          reaction_counts?: Json;
+          like_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -531,7 +531,7 @@ export interface Database {
           is_admin_post?: boolean;
           is_pinned?: boolean;
           reply_count?: number;
-          reaction_counts?: Json;
+          like_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -590,41 +590,96 @@ export interface Database {
           },
         ];
       };
-      buzz_reactions: {
+      buzz_likes: {
         Row: {
           id: string;
           post_id: string;
-          author_id: string;
-          emoji: string;
+          user_id: string;
           created_at: string;
         };
         Insert: {
           id?: string;
           post_id: string;
-          author_id: string;
-          emoji: string;
+          user_id: string;
           created_at?: string;
         };
         Update: {
           id?: string;
           post_id?: string;
-          author_id?: string;
-          emoji?: string;
+          user_id?: string;
           created_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "buzz_reactions_post_id_fkey";
+            foreignKeyName: "buzz_likes_post_id_fkey";
             columns: ["post_id"];
             isOneToOne: false;
             referencedRelation: "buzz_posts";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "buzz_reactions_author_id_fkey";
-            columns: ["author_id"];
+            foreignKeyName: "buzz_likes_user_id_fkey";
+            columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      buzz_reports: {
+        Row: {
+          id: string;
+          reporter_id: string;
+          post_id: string | null;
+          reply_id: string | null;
+          reason: string;
+          details: string | null;
+          status: string;
+          reviewed_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporter_id: string;
+          post_id?: string | null;
+          reply_id?: string | null;
+          reason: string;
+          details?: string | null;
+          status?: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporter_id?: string;
+          post_id?: string | null;
+          reply_id?: string | null;
+          reason?: string;
+          details?: string | null;
+          status?: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "buzz_reports_reporter_id_fkey";
+            columns: ["reporter_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "buzz_reports_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "buzz_posts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "buzz_reports_reply_id_fkey";
+            columns: ["reply_id"];
+            isOneToOne: false;
+            referencedRelation: "buzz_replies";
             referencedColumns: ["id"];
           },
         ];
@@ -875,9 +930,29 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
-      toggle_buzz_reaction: {
-        Args: { p_post_id: string; p_emoji: string };
-        Returns: boolean;
+      get_hot_buzz_posts: {
+        Args: {
+          p_cursor_score?: number | null;
+          p_cursor_created_at?: string | null;
+          p_cursor_id?: string | null;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          author_id: string;
+          author_name: string | null;
+          content: string;
+          is_admin_post: boolean;
+          is_pinned: boolean;
+          reply_count: number;
+          like_count: number;
+          created_at: string;
+          hot_score: number;
+        }[];
+      };
+      resolve_buzz_report: {
+        Args: { p_report_id: string; p_action: string };
+        Returns: undefined;
       };
       set_leaving_campus_mode: {
         Args: { p_enabled: boolean; p_leaving_date?: string | null };
