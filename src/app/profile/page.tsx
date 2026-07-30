@@ -12,6 +12,7 @@ import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { Skeleton, SkeletonLine, SkeletonRow } from "@/components/ui/skeleton";
 import { SavedHostelRow } from "@/components/hostels/saved-hostel-row";
 import { LegalLinksRow } from "@/components/legal/legal-links-row";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAuth } from "@/providers/auth-provider";
 import { useSavedHostels } from "@/hooks/use-saved-hostels";
 import { useMySubmissions } from "@/hooks/use-my-submissions";
@@ -21,7 +22,7 @@ import { useMyMarketListings } from "@/hooks/use-my-market-listings";
 import { useSetMarketListingStatus } from "@/hooks/use-set-market-listing-status";
 import { useDeleteMarketListing } from "@/hooks/use-delete-market-listing";
 import { LeavingCampusToggle } from "@/components/market/leaving-campus-toggle";
-import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
 import type { MarketListing } from "@/lib/queries/market";
 
@@ -191,16 +192,20 @@ export default function ProfilePage() {
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-6">
       <div className="flex items-center gap-3">
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-brand-800 font-display text-h1 text-white">
-          {getInitials(profile?.fullName, profile?.email ?? user.email)}
-        </div>
-        <div className="flex min-w-0 flex-col">
+        <UserAvatar username={profile?.username ?? null} avatarColor={profile?.avatarColor ?? null} size="lg" />
+        <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="line-clamp-1 font-display text-h1 text-ink-900">{profile?.fullName || "Student"}</span>
+            <span className="line-clamp-1 font-display text-h1 text-ink-900">{profile?.username || "Student"}</span>
             {profile?.isVerified && <VerifiedBadge label={profile.verificationLabel} />}
           </div>
           <span className="line-clamp-1 text-body-sm text-ink-500">{profile?.email ?? user.email}</span>
         </div>
+        <Link href="/profile/edit" className="shrink-0">
+          <Button variant="ghost" size="sm">
+            <Pencil className="size-3.5" />
+            Edit
+          </Button>
+        </Link>
       </div>
 
       {profile?.role === "admin" && (

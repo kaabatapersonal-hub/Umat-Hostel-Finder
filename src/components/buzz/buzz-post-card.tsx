@@ -11,6 +11,8 @@ import { LikeButton, BUZZ_LIKE_JOIN_MESSAGE } from "./like-button";
 import { ShareButton } from "./share-button";
 import { ReplySheet } from "./reply-sheet";
 import { ReportBuzzSheet } from "./report-buzz-sheet";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { AuthorLink } from "@/components/ui/author-link";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
 import { useSetBuzzPostPinned } from "@/hooks/use-set-buzz-post-pinned";
@@ -19,7 +21,7 @@ import { useTrackBuzzPostView } from "@/hooks/use-track-buzz-post-view";
 import { useSaveBuzzPostImage } from "@/hooks/use-save-buzz-post-image";
 import { triggerHaptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sounds";
-import { getInitials, formatRelativeTime, formatCompactCount, cn } from "@/lib/utils";
+import { formatRelativeTime, formatCompactCount, cn } from "@/lib/utils";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzPost } from "@/lib/queries/buzz";
 
@@ -184,12 +186,19 @@ export function BuzzPostCard({
       )}
     >
       <div className="flex items-start gap-2.5">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-body-strong text-brand-800">
-          {getInitials(post.authorName, null)}
-        </div>
+        <AuthorLink authorId={post.authorId} isAnonymous={post.isAnonymous} className="shrink-0">
+          <UserAvatar
+            username={post.authorName}
+            avatarColor={post.authorAvatarColor}
+            isAnonymous={post.isAnonymous}
+            size="sm"
+          />
+        </AuthorLink>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="line-clamp-1 text-body-strong text-ink-900">{post.authorName || "Student"}</span>
+            <AuthorLink authorId={post.authorId} isAnonymous={post.isAnonymous} className="line-clamp-1 text-body-strong text-ink-900">
+              {post.authorName || "Student"}
+            </AuthorLink>
             {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
             {post.isAdminPost && (
               <Badge variant="available" size="sm">

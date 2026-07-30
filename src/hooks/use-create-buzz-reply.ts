@@ -52,9 +52,10 @@ export function useCreateBuzzReply() {
         id: tempId,
         postId,
         authorId: user?.id ?? "",
-        authorName: profile?.fullName ?? null,
+        authorName: profile?.username ?? null,
         content,
         gifUrl: gifUrl ?? null,
+        authorAvatarColor: profile?.avatarColor ?? null,
         createdAt: new Date().toISOString(),
       };
 

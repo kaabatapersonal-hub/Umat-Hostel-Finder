@@ -7,10 +7,12 @@ import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { AuthorLink } from "@/components/ui/author-link";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useMarkNotificationRead } from "@/hooks/use-mark-notification-read";
 import { useMarkAllNotificationsRead } from "@/hooks/use-mark-all-notifications-read";
-import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import type { AppNotification } from "@/lib/queries/notifications";
 
 export interface NotificationPanelProps {
@@ -87,34 +89,33 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
         ) : (
           <div className="flex flex-col gap-1">
             {notifications.map((n) => (
-              <button
+              <div
                 key={n.id}
-                type="button"
-                onClick={() => handleTap(n)}
-                className={cn(
-                  "flex items-start gap-2.5 rounded-md p-3 text-left transition-colors",
-                  !n.isRead && "bg-brand-50/60"
-                )}
+                className={cn("flex items-start gap-2.5 rounded-md p-3", !n.isRead && "bg-brand-50/60")}
               >
                 {n.actorId ? (
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-body-strong text-brand-800">
-                    {getInitials(n.actorName, null)}
-                  </div>
+                  // A real actor -- the avatar is its own link to their
+                  // profile, separate from the row's own tap target (a
+                  // <button> can't contain a nested <a>, so these are
+                  // siblings, not parent/child).
+                  <AuthorLink authorId={n.actorId} className="shrink-0">
+                    <UserAvatar username={n.actorName} avatarColor={null} size="sm" />
+                  </AuthorLink>
                 ) : (
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#0E4A34]">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0E4A34]">
                     {/* eslint-disable-next-line @next/next/no-img-element -- a
                         tiny static brand mark, not a candidate for next/image's
                         responsive-loading machinery. */}
                     <img src="/icon-square.svg" alt="" width={20} height={20} className="rounded-sm" />
                   </div>
                 )}
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <button type="button" onClick={() => handleTap(n)} className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
                   <span className="text-body-strong text-ink-900">{n.title}</span>
                   {n.body && <span className="line-clamp-2 text-body-sm text-ink-500">{n.body}</span>}
                   <span className="text-caption text-ink-300">{formatRelativeTime(n.createdAt)}</span>
-                </div>
+                </button>
                 {!n.isRead && <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-gold-500" />}
-              </button>
+              </div>
             ))}
 
             {hasNextPage && (

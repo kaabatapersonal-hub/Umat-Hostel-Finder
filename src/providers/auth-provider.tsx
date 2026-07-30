@@ -20,6 +20,11 @@ export interface Profile {
   // how these gate which admin tabs render.
   isSuperAdmin: boolean;
   adminPermissions: AdminPermission[];
+  username: string | null;
+  bio: string | null;
+  whatsappNumber: string | null;
+  phoneNumber: string | null;
+  avatarColor: string | null;
 }
 
 interface RequireAuthOptions {
@@ -41,6 +46,11 @@ interface AuthContextValue {
   // has to repeat the tap that got them here.
   requireAuth: (action: () => void, options?: RequireAuthOptions) => void;
   signOut: () => Promise<void>;
+  // Re-fetches the signed-in user's own profile row and updates context --
+  // called after a successful edit-profile save so the new username/
+  // avatar color/bio show up everywhere in the app immediately, without
+  // waiting for the next full page load or sign-in.
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -83,44 +93,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  const PROFILE_COLUMNS =
+    "id, full_name, email, avatar_url, role, is_suspended, is_verified, verification_label, is_super_admin, admin_permissions, username, bio, whatsapp_number, phone_number, avatar_color";
+
+  async function fetchProfile(userId: string) {
+    const supabase = createClient();
+    const { data } = await supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).maybeSingle();
+
+    if (data?.is_suspended) {
+      // The real backstop is server-side (a suspended account's own
+      // review/submission inserts are rejected by RLS regardless of
+      // this check) -- this is just the client-side kick-out so a
+      // suspended session doesn't keep browsing as if nothing happened.
+      await supabase.auth.signOut();
+      setProfile(null);
+      return;
+    }
+    setProfile(
+      data
+        ? {
+            id: data.id,
+            fullName: data.full_name,
+            email: data.email,
+            avatarUrl: data.avatar_url,
+            role: (data.role as ProfileRole) ?? "student",
+            isVerified: data.is_verified,
+            verificationLabel: data.verification_label,
+            isSuperAdmin: data.is_super_admin,
+            adminPermissions: Array.isArray(data.admin_permissions) ? (data.admin_permissions as AdminPermission[]) : [],
+            username: data.username,
+            bio: data.bio,
+            whatsappNumber: data.whatsapp_number,
+            phoneNumber: data.phone_number,
+            avatarColor: data.avatar_color,
+          }
+        : null
+    );
+  }
+
   useEffect(() => {
     if (!user) {
       setProfile(null);
       return;
     }
-    const supabase = createClient();
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, avatar_url, role, is_suspended, is_verified, verification_label, is_super_admin, admin_permissions")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.is_suspended) {
-          // The real backstop is server-side (a suspended account's own
-          // review/submission inserts are rejected by RLS regardless of
-          // this check) -- this is just the client-side kick-out so a
-          // suspended session doesn't keep browsing as if nothing happened.
-          supabase.auth.signOut();
-          setProfile(null);
-          return;
-        }
-        setProfile(
-          data
-            ? {
-                id: data.id,
-                fullName: data.full_name,
-                email: data.email,
-                avatarUrl: data.avatar_url,
-                role: (data.role as ProfileRole) ?? "student",
-                isVerified: data.is_verified,
-                verificationLabel: data.verification_label,
-                isSuperAdmin: data.is_super_admin,
-                adminPermissions: Array.isArray(data.admin_permissions) ? (data.admin_permissions as AdminPermission[]) : [],
-              }
-            : null
-        );
-      });
+    fetchProfile(user.id);
   }, [user]);
+
+  async function refreshProfile() {
+    if (!user) return;
+    await fetchProfile(user.id);
+  }
 
   function requireAuth(action: () => void, options?: RequireAuthOptions) {
     if (user) {
@@ -153,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, requireAuth, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, requireAuth, signOut, refreshProfile }}>
       {children}
       <AuthSheet
         open={isSheetOpen}

@@ -11,11 +11,13 @@ export interface BuzzPost {
   replyCount: number;
   likeCount: number;
   viewCount: number;
+  isAnonymous: boolean;
+  authorAvatarColor: string | null;
   createdAt: string;
 }
 
 const BUZZ_POST_COLUMNS =
-  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, like_count, view_count, created_at";
+  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, like_count, view_count, is_anonymous, author_avatar_color, created_at";
 
 interface BuzzPostRow {
   id: string;
@@ -27,6 +29,8 @@ interface BuzzPostRow {
   reply_count: number;
   like_count: number;
   view_count: number;
+  is_anonymous: boolean;
+  author_avatar_color: string | null;
   created_at: string;
 }
 
@@ -41,6 +45,8 @@ function mapBuzzPost(row: BuzzPostRow): BuzzPost {
     replyCount: row.reply_count,
     likeCount: row.like_count,
     viewCount: row.view_count,
+    isAnonymous: row.is_anonymous,
+    authorAvatarColor: row.author_avatar_color,
     createdAt: row.created_at,
   };
 }
@@ -141,15 +147,63 @@ export async function getPinnedBuzzPosts(supabase: SupabaseClient<Database>): Pr
   return (data ?? []).map(mapBuzzPost);
 }
 
+export interface GetUserBuzzPostsResult {
+  posts: BuzzPost[];
+  nextCursor: BuzzCursor | null;
+}
+
+// Powers a profile page's own "Posts" section -- newest first, same
+// cursor shape as getBuzzFeed. Anonymous posts are excluded unless
+// `includeAnonymous` is set, which the profile page only ever passes
+// when the viewer IS this profile's owner (see the brief's "if viewing
+// your own profile, show all your posts including anonymous ones").
+// This is a client-side filter, not an RLS one -- buzz_posts is fully
+// public-read already, and is_anonymous only controls how a post is
+// *displayed* (author_name/author_avatar_color already say 'Student'/
+// null at write time), not who can see the row exists. See the
+// migration's own note on this being the deliberate "Option A"
+// simplification: author_id and is_anonymous are technically visible to
+// anyone inspecting the API response directly; nothing in this app
+// currently renders them for a post it knows is anonymous.
+export async function getUserBuzzPosts(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  { includeAnonymous = false, cursor, limit = BUZZ_PAGE_SIZE }: { includeAnonymous?: boolean; cursor?: BuzzCursor | null; limit?: number } = {}
+): Promise<GetUserBuzzPostsResult> {
+  let query = supabase
+    .from("buzz_posts")
+    .select(BUZZ_POST_COLUMNS)
+    .eq("author_id", userId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (!includeAnonymous) query = query.eq("is_anonymous", false);
+  if (cursor) {
+    query = query.or(`created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const posts = (data ?? []).map(mapBuzzPost);
+  const last = posts[posts.length - 1];
+  const nextCursor = posts.length === limit && last ? { createdAt: last.createdAt, id: last.id } : null;
+
+  return { posts, nextCursor };
+}
+
 export async function createBuzzPost(
   supabase: SupabaseClient<Database>,
-  { authorId, content }: { authorId: string; content: string }
+  { authorId, content, isAnonymous }: { authorId: string; content: string; isAnonymous?: boolean }
 ): Promise<BuzzPost> {
-  // author_name/is_admin_post are never sent -- protect_buzz_post_writes
-  // resolves both server-side from the current profiles row.
+  // author_name/author_avatar_color/is_admin_post are never sent --
+  // protect_buzz_post_writes resolves all three server-side from the
+  // current profiles row (and from is_anonymous itself, which IS
+  // client-set here -- it's the one input that trigger can't infer).
   const { data, error } = await supabase
     .from("buzz_posts")
-    .insert({ author_id: authorId, content })
+    .insert({ author_id: authorId, content, is_anonymous: isAnonymous ?? false })
     .select(BUZZ_POST_COLUMNS)
     .single();
 
@@ -181,10 +235,14 @@ export interface BuzzReply {
   // own comment on why the CHECK constraint enforces this at the
   // database level too, not just in the compose UI.
   gifUrl: string | null;
+  // Replies are never anonymous (see the profile-system migration's own
+  // note), so unlike BuzzPost there's no isAnonymous field here -- the
+  // avatar/name are always real.
+  authorAvatarColor: string | null;
   createdAt: string;
 }
 
-const BUZZ_REPLY_COLUMNS = "id, post_id, author_id, author_name, content, gif_url, created_at";
+const BUZZ_REPLY_COLUMNS = "id, post_id, author_id, author_name, content, gif_url, author_avatar_color, created_at";
 
 interface BuzzReplyRow {
   id: string;
@@ -193,6 +251,7 @@ interface BuzzReplyRow {
   author_name: string | null;
   content: string;
   gif_url: string | null;
+  author_avatar_color: string | null;
   created_at: string;
 }
 
@@ -204,6 +263,7 @@ function mapBuzzReply(row: BuzzReplyRow): BuzzReply {
     authorName: row.author_name,
     content: row.content,
     gifUrl: row.gif_url,
+    authorAvatarColor: row.author_avatar_color,
     createdAt: row.created_at,
   };
 }

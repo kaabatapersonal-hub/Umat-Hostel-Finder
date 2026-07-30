@@ -11,6 +11,11 @@ import { playSound } from "@/lib/sounds";
 
 type BuzzFeedCache = InfiniteData<GetBuzzFeedResult>;
 
+export interface CreateBuzzPostInput {
+  content: string;
+  isAnonymous?: boolean;
+}
+
 function replaceFirstPagePosts(
   cache: BuzzFeedCache | undefined,
   updater: (posts: BuzzPost[]) => BuzzPost[]
@@ -38,17 +43,17 @@ export function useCreateBuzzPost() {
   // useMutation returns, and onError only ever reads it once a real
   // error has actually happened, by which point every render has already
   // set it.
-  const mutationRef = useRef<UseMutationResult<BuzzPost, unknown, string> | null>(null);
+  const mutationRef = useRef<UseMutationResult<BuzzPost, unknown, CreateBuzzPostInput> | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, isAnonymous }: CreateBuzzPostInput) => {
       const {
         data: { user: freshUser },
       } = await supabase.auth.getUser();
       if (!freshUser) throw new Error("Not signed in");
-      return createBuzzPost(supabase, { authorId: freshUser.id, content });
+      return createBuzzPost(supabase, { authorId: freshUser.id, content, isAnonymous });
     },
-    onMutate: async (content: string) => {
+    onMutate: async ({ content, isAnonymous }: CreateBuzzPostInput) => {
       await queryClient.cancelQueries({ queryKey: ["buzz-feed"] });
       const previous = queryClient.getQueryData<BuzzFeedCache>(["buzz-feed"]);
       const tempId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -56,13 +61,15 @@ export function useCreateBuzzPost() {
       const optimisticPost: BuzzPost = {
         id: tempId,
         authorId: user?.id ?? "",
-        authorName: profile?.fullName ?? null,
+        authorName: isAnonymous ? "Student" : (profile?.username ?? "Student"),
         content,
         isAdminPost: profile?.role === "admin",
         isPinned: false,
         replyCount: 0,
         likeCount: 0,
         viewCount: 0,
+        isAnonymous: !!isAnonymous,
+        authorAvatarColor: isAnonymous ? null : (profile?.avatarColor ?? null),
         createdAt: new Date().toISOString(),
       };
 
@@ -72,7 +79,7 @@ export function useCreateBuzzPost() {
 
       return { previous, tempId };
     },
-    onError: (err, content, context) => {
+    onError: (err, variables, context) => {
       if (context?.previous) queryClient.setQueryData(["buzz-feed"], context.previous);
 
       // The server-side rate limit (enforce_buzz_post_rate_limit,
@@ -90,11 +97,11 @@ export function useCreateBuzzPost() {
               message: "Couldn't post — try again?",
               variant: "error",
               actionLabel: "Retry",
-              onAction: () => mutationRef.current?.mutate(content),
+              onAction: () => mutationRef.current?.mutate(variables),
             }
       );
     },
-    onSuccess: (newPost, _content, context) => {
+    onSuccess: (newPost, _variables, context) => {
       queryClient.setQueryData<BuzzFeedCache>(["buzz-feed"], (old) =>
         replaceFirstPagePosts(old, (posts) => posts.map((p) => (p.id === context?.tempId ? newPost : p)))
       );

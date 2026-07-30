@@ -4,11 +4,13 @@ import { useState } from "react";
 import Image from "next/image";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { AuthorLink } from "@/components/ui/author-link";
 import { PostActionsMenu, type PostActionItem } from "./post-actions-menu";
 import { ReportBuzzSheet } from "./report-buzz-sheet";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzReply } from "@/hooks/use-delete-buzz-reply";
-import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzReply } from "@/lib/queries/buzz";
 
@@ -47,12 +49,14 @@ export function ReplyCard({ reply, isAuthorVerified = false, authorVerificationL
 
   return (
     <div className={cn("flex items-start gap-2.5 rounded-md bg-surface-muted p-3", isOptimistic && "opacity-60")}>
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-caption font-semibold text-brand-800">
-        {getInitials(reply.authorName, null)}
-      </div>
+      <AuthorLink authorId={reply.authorId} className="shrink-0">
+        <UserAvatar username={reply.authorName} avatarColor={reply.authorAvatarColor} size="sm" />
+      </AuthorLink>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-body-sm font-medium text-ink-900">{reply.authorName || "Student"}</span>
+          <AuthorLink authorId={reply.authorId} className="text-body-sm font-medium text-ink-900">
+            {reply.authorName || "Student"}
+          </AuthorLink>
           {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
           <span className="text-caption text-ink-300">{isOptimistic ? "Sending…" : formatRelativeTime(reply.createdAt)}</span>
         </div>

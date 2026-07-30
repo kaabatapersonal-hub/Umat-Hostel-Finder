@@ -1783,6 +1783,154 @@ async function main() {
   }
 
   // =====================================================================
+  // User profile system (username/bio/contact numbers, anonymous posting)
+  // =====================================================================
+  section("user profiles");
+  {
+    const anonPublicProfile = await rpc(null, "get_public_profile", { p_user_id: strangerUid });
+    check(
+      "anon can call get_public_profile and gets public fields only (no email key at all)",
+      anonPublicProfile.ok && anonPublicProfile.body?.[0] && !("email" in anonPublicProfile.body[0]),
+      JSON.stringify(anonPublicProfile.body)
+    );
+
+    if (hasDistinctOwner) {
+      const ownerViewsStranger = await rpc(ownerToken, "get_public_profile", { p_user_id: strangerUid });
+      check(
+        "a different signed-in user can also read someone else's public profile fields",
+        ownerViewsStranger.ok && ownerViewsStranger.body?.[0] !== undefined,
+        JSON.stringify(ownerViewsStranger.body)
+      );
+    } else {
+      skip("a different signed-in user can also read someone else's public profile fields", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    // Own-row update: username/bio/contact numbers are not privilege-
+    // sensitive (unlike role/is_verified/admin_permissions, which have
+    // their own revert-on-unauthorized-change triggers), so this is a
+    // plain profiles_update_own-gated PATCH, no RPC needed.
+    const uniqueUsername = `audit_user_${Date.now()}`.slice(0, 30);
+    const selfUpdate = await patch(
+      strangerToken,
+      `/profiles?id=eq.${strangerUid}`,
+      { username: uniqueUsername, bio: "Audit test bio", whatsapp_number: "233246408602", phone_number: "233246408602" },
+      "return=representation"
+    );
+    check(
+      "a user can update their own username/bio/contact numbers",
+      selfUpdate.ok && selfUpdate.body?.[0]?.username === uniqueUsername,
+      JSON.stringify(selfUpdate.body)
+    );
+
+    if (hasDistinctOwner) {
+      // RLS filtering an UPDATE to zero matching rows is still a 200 with
+      // an empty body, not an error status -- same reasoning as every
+      // other "a different user cannot touch someone else's row" check
+      // in this script (see e.g. the notifications section above).
+      const otherUpdatesStranger = await patch(
+        ownerToken,
+        `/profiles?id=eq.${strangerUid}`,
+        { username: "hijacked_username" },
+        "return=representation"
+      );
+      check(
+        "a different user cannot update someone else's profile",
+        otherUpdatesStranger.ok && (otherUpdatesStranger.body ?? []).length === 0,
+        JSON.stringify(otherUpdatesStranger.body)
+      );
+      const strangerUnchanged = await get(strangerToken, `/profiles?id=eq.${strangerUid}&select=username`);
+      check(
+        "...and the stranger's username is confirmed unchanged",
+        strangerUnchanged.body?.[0]?.username === uniqueUsername,
+        JSON.stringify(strangerUnchanged.body)
+      );
+    } else {
+      skip("a different user cannot update someone else's profile", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const tooLongUsername = await patch(strangerToken, `/profiles?id=eq.${strangerUid}`, { username: "x".repeat(31) });
+    check("a username over 30 chars is rejected (CHECK constraint)", !tooLongUsername.ok, `status ${tooLongUsername.status}`);
+
+    const badCharsUsername = await patch(strangerToken, `/profiles?id=eq.${strangerUid}`, { username: "bad!name$" });
+    check("a username with disallowed characters is rejected (CHECK constraint)", !badCharsUsername.ok, `status ${badCharsUsername.status}`);
+
+    const validUsername = await patch(
+      strangerToken,
+      `/profiles?id=eq.${strangerUid}`,
+      { username: "Valid_Name 2" },
+      "return=representation"
+    );
+    check(
+      "a username with letters/numbers/underscore/space is accepted",
+      validUsername.ok && validUsername.body?.[0]?.username === "Valid_Name 2",
+      JSON.stringify(validUsername.body)
+    );
+
+    const tooLongBio = await patch(strangerToken, `/profiles?id=eq.${strangerUid}`, { bio: "x".repeat(151) });
+    check("a bio over 150 chars is rejected (CHECK constraint)", !tooLongBio.ok, `status ${tooLongBio.status}`);
+
+    // Restore the stranger's profile to a clean slate for future runs.
+    await patch(strangerToken, `/profiles?id=eq.${strangerUid}`, { username: null, bio: null, whatsapp_number: null, phone_number: null });
+
+    // -------------------------------------------------------------------
+    // Anonymous posting (Buzz)
+    // -------------------------------------------------------------------
+    const anonPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Profile Audit] Anonymous post test", is_anonymous: true },
+      "return=representation"
+    );
+    const anonPostRow = anonPost.body?.[0];
+    check(
+      "an anonymous post's author_name is forced to 'Student' and its avatar color is stripped",
+      anonPost.ok && anonPostRow?.author_name === "Student" && anonPostRow?.author_avatar_color === null,
+      JSON.stringify(anonPostRow)
+    );
+    // Option A (documented in the migration and getUserBuzzPosts' own
+    // comment): author_id is NOT hidden from the raw API response for an
+    // anonymous post -- only the client chooses never to render/link it.
+    // This assertion exists to make that simplification explicit and
+    // testable, not to claim it's actually private at the database level.
+    check(
+      "(documenting Option A) an anonymous post's author_id is still present in the raw API response, by design",
+      anonPostRow?.author_id === strangerUid,
+      JSON.stringify(anonPostRow)
+    );
+
+    const anonPostId = anonPostRow?.id;
+    const toggleAnonymousAfterCreate = await patch(strangerToken, `/buzz_posts?id=eq.${anonPostId}`, { is_anonymous: false }, "return=representation");
+    check(
+      "is_anonymous cannot be toggled after a post is created (trigger locks it)",
+      toggleAnonymousAfterCreate.ok && toggleAnonymousAfterCreate.body?.[0]?.is_anonymous === true,
+      JSON.stringify(toggleAnonymousAfterCreate.body)
+    );
+    if (anonPostId) await del(adminToken, `/buzz_posts?id=eq.${anonPostId}`);
+
+    // Replies are never anonymous -- always the real author_name/avatar,
+    // falling back to 'Student' only when no username is set.
+    const replyIdentityPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Profile Audit] Reply identity test" },
+      "return=representation"
+    );
+    const replyIdentityPostId = replyIdentityPost.body?.[0]?.id;
+    const identityReply = await post(
+      strangerToken,
+      "/buzz_replies",
+      { post_id: replyIdentityPostId, author_id: strangerUid, content: "A normal, non-anonymous reply" },
+      "return=representation"
+    );
+    check(
+      "a reply always carries the real author_name (never 'anonymous')",
+      identityReply.ok && identityReply.body?.[0]?.author_name !== null,
+      JSON.stringify(identityReply.body)
+    );
+    if (replyIdentityPostId) await del(adminToken, `/buzz_posts?id=eq.${replyIdentityPostId}`);
+  }
+
+  // =====================================================================
   // market_listings + app_config (Session 19)
   // =====================================================================
   section("market");

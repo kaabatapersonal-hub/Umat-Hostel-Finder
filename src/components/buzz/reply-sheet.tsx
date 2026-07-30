@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { AuthorLink } from "@/components/ui/author-link";
 import { ReplyCard } from "./reply-card";
 import { GifPickerSheet } from "./gif-picker-sheet";
 import { useAuth } from "@/providers/auth-provider";
@@ -14,7 +16,7 @@ import { useBuzzReplies } from "@/hooks/use-buzz-replies";
 import { useCreateBuzzReply } from "@/hooks/use-create-buzz-reply";
 import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
-import { getInitials, formatRelativeTime, cn } from "@/lib/utils";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import type { BuzzPost } from "@/lib/queries/buzz";
 import type { GifResult } from "@/lib/queries/gifs";
 
@@ -91,12 +93,14 @@ export function ReplySheet({ post, open, onClose, isAuthorVerified = false, auth
         <>
           <div className="mb-3 shrink-0 rounded-md bg-brand-50/40 p-3">
             <div className="flex items-start gap-2.5">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-body-strong text-brand-800">
-                {getInitials(post.authorName, null)}
-              </div>
+              <AuthorLink authorId={post.authorId} isAnonymous={post.isAnonymous} className="shrink-0">
+                <UserAvatar username={post.authorName} avatarColor={post.authorAvatarColor} isAnonymous={post.isAnonymous} size="sm" />
+              </AuthorLink>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="line-clamp-1 text-body-strong text-ink-900">{post.authorName || "Student"}</span>
+                  <AuthorLink authorId={post.authorId} isAnonymous={post.isAnonymous} className="line-clamp-1 text-body-strong text-ink-900">
+                    {post.authorName || "Student"}
+                  </AuthorLink>
                   {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
                 </div>
                 <span className="text-caption text-ink-500">{formatRelativeTime(post.createdAt)}</span>

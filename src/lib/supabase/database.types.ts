@@ -22,6 +22,11 @@ export interface Database {
           verification_label: string | null;
           is_super_admin: boolean;
           admin_permissions: Json;
+          username: string | null;
+          bio: string | null;
+          whatsapp_number: string | null;
+          phone_number: string | null;
+          avatar_color: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -38,6 +43,11 @@ export interface Database {
           verification_label?: string | null;
           is_super_admin?: boolean;
           admin_permissions?: Json;
+          username?: string | null;
+          bio?: string | null;
+          whatsapp_number?: string | null;
+          phone_number?: string | null;
+          avatar_color?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -54,6 +64,11 @@ export interface Database {
           verification_label?: string | null;
           is_super_admin?: boolean;
           admin_permissions?: Json;
+          username?: string | null;
+          bio?: string | null;
+          whatsapp_number?: string | null;
+          phone_number?: string | null;
+          avatar_color?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -509,6 +524,8 @@ export interface Database {
           reply_count: number;
           like_count: number;
           view_count: number;
+          is_anonymous: boolean;
+          author_avatar_color: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -522,6 +539,8 @@ export interface Database {
           reply_count?: number;
           like_count?: number;
           view_count?: number;
+          is_anonymous?: boolean;
+          author_avatar_color?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -535,6 +554,8 @@ export interface Database {
           reply_count?: number;
           like_count?: number;
           view_count?: number;
+          is_anonymous?: boolean;
+          author_avatar_color?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -556,6 +577,7 @@ export interface Database {
           author_name: string | null;
           content: string;
           gif_url: string | null;
+          author_avatar_color: string | null;
           created_at: string;
         };
         Insert: {
@@ -565,6 +587,7 @@ export interface Database {
           author_name?: string | null;
           content: string;
           gif_url?: string | null;
+          author_avatar_color?: string | null;
           created_at?: string;
         };
         Update: {
@@ -574,6 +597,7 @@ export interface Database {
           author_name?: string | null;
           content?: string;
           gif_url?: string | null;
+          author_avatar_color?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -1016,8 +1040,23 @@ export interface Database {
           reply_count: number;
           like_count: number;
           view_count: number;
+          is_anonymous: boolean;
+          author_avatar_color: string | null;
           created_at: string;
           hot_score: number;
+        }[];
+      };
+      get_public_profile: {
+        Args: { p_user_id: string };
+        Returns: {
+          username: string | null;
+          bio: string | null;
+          whatsapp_number: string | null;
+          phone_number: string | null;
+          avatar_color: string | null;
+          is_verified: boolean;
+          verification_label: string | null;
+          created_at: string;
         }[];
       };
       resolve_buzz_report: {
