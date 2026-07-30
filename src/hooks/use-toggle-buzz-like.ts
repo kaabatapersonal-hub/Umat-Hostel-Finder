@@ -31,7 +31,6 @@ export function useToggleBuzzLike(postId: string) {
       queryClient.invalidateQueries({ queryKey: ["buzz-feed"] });
       queryClient.invalidateQueries({ queryKey: ["buzz-feed-hot"] });
       queryClient.invalidateQueries({ queryKey: ["buzz-pinned"] });
-      queryClient.invalidateQueries({ queryKey: ["buzz-post", postId] });
     },
   });
 }

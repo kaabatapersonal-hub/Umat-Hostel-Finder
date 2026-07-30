@@ -1,31 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { MessageCircle, Eye } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { MessageCircle, Eye, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { PostActionsMenu, type PostActionItem } from "./post-actions-menu";
-import { LikeButton } from "./like-button";
-import { BookmarkButton } from "./bookmark-button";
+import { LikeButton, BUZZ_LIKE_JOIN_MESSAGE } from "./like-button";
 import { ShareButton } from "./share-button";
+import { ReplySheet } from "./reply-sheet";
 import { ReportBuzzSheet } from "./report-buzz-sheet";
 import { useAuth } from "@/providers/auth-provider";
 import { useDeleteBuzzPost } from "@/hooks/use-delete-buzz-post";
 import { useSetBuzzPostPinned } from "@/hooks/use-set-buzz-post-pinned";
+import { useToggleBuzzLike } from "@/hooks/use-toggle-buzz-like";
 import { useTrackBuzzPostView } from "@/hooks/use-track-buzz-post-view";
+import { useSaveBuzzPostImage } from "@/hooks/use-save-buzz-post-image";
+import { triggerHaptic } from "@/lib/haptics";
+import { playSound } from "@/lib/sounds";
 import { getInitials, formatRelativeTime, formatCompactCount, cn } from "@/lib/utils";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import type { BuzzPost } from "@/lib/queries/buzz";
 
-// Long enough that a genuinely 3-line post rarely trips this, short enough
-// that an actual long post reliably does -- there's no line-count
-// measurement available before paint, so this is a length-based proxy for
-// "line-clamp-3 is probably cutting something off."
-const FEED_TRUNCATION_HINT_LENGTH = 220;
 const BUZZ_REPORT_JOIN_MESSAGE = "Join Campa to report a post";
+const DOUBLE_TAP_THRESHOLD_MS = 300;
+const FIRE_BURST_DURATION_MS = 700;
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && !!target.closest("button, a, input, textarea");
+}
 
 export interface BuzzPostCardProps {
   post: BuzzPost;
@@ -33,50 +37,107 @@ export interface BuzzPostCardProps {
   // Same reasoning as HostelCard -- only client-appended pages get the
   // entrance fade, first-paint content must render visible immediately.
   animateIn?: boolean;
-  // The detail page renders this same card in-place (full content, more
-  // visual weight as "the parent"), not as a link to itself.
-  linkToDetail?: boolean;
   // Resolved by the caller (one batched get_verified_profiles call for
   // every post on screen) rather than fetched per-card -- see
   // use-verified-profiles.ts.
   isAuthorVerified?: boolean;
   authorVerificationLabel?: string | null;
   // Same batching principle as verification -- one useMyLikedPosts/
-  // useMyBuzzReports/useMyBookmarkedPosts call per screen, not per-card.
+  // useMyBuzzReports call per screen, not per-card.
   isLiked?: boolean;
   isReported?: boolean;
-  isBookmarked?: boolean;
 }
 
+// Buzz is a continuous, feed-only surface now -- there's no post detail
+// page to link to (see the deleted post-detail-view.tsx and the
+// src/app/buzz/[id] redirect). Every interaction happens right here: a
+// single tap or a double-tap likes, the reply icon opens a bottom sheet,
+// save downloads a branded image, share opens the system share sheet.
 export function BuzzPostCard({
   post,
   index = 0,
   animateIn = true,
-  linkToDetail = true,
   isAuthorVerified = false,
   authorVerificationLabel = null,
   isLiked = false,
   isReported = false,
-  isBookmarked = false,
 }: BuzzPostCardProps) {
   const { user, profile, requireAuth } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [repliesOpen, setRepliesOpen] = useState(false);
   const deletePost = useDeleteBuzzPost();
   const setPinned = useSetBuzzPostPinned();
+  const toggleLike = useToggleBuzzLike(post.id);
+  const { saveAsImage, isSaving } = useSaveBuzzPostImage();
 
   // Tagged with this id prefix by useCreateBuzzPost's onMutate -- same
   // placeholder-id convention useToggleSave already uses. Nothing about
-  // this post exists server-side yet: no detail page to link to, no
-  // likes/replies/moderation/reporting possible until the real row lands.
+  // this post exists server-side yet: no likes/replies/moderation/
+  // reporting/saving possible until the real row lands.
   const isOptimistic = post.id.startsWith("optimistic-");
 
-  // Feed-context cards only -- the detail page renders this same card
-  // in-place (linkToDetail=false) for the parent post, which the brief
-  // scopes out ("IntersectionObserver ... per feed card").
-  const viewRef = useTrackBuzzPostView(post.id, post.authorId, {
-    enabled: linkToDetail && !isOptimistic,
-  });
+  const viewRef = useTrackBuzzPostView(post.id, post.authorId, { enabled: !isOptimistic });
+
+  // Short-lived local override for the optimistic feel, same pattern as
+  // before -- cleared once the mutation settles and useToggleBuzzLike's
+  // own invalidation has brought the server's true state back in.
+  const [localLikeOverride, setLocalLikeOverride] = useState<boolean | null>(null);
+  // Bumped on every fresh *like* (never an unlike) -- both the button's
+  // pulse and the big fire-burst overlay key off this same trigger,
+  // whether it came from tapping the button or double-tapping the card.
+  const [likePulseKey, setLikePulseKey] = useState(0);
+  const [showFireBurst, setShowFireBurst] = useState(false);
+  const lastTapRef = useRef(0);
+
+  const liked = localLikeOverride ?? isLiked;
+  const displayLikeCount =
+    post.likeCount + (localLikeOverride === null || localLikeOverride === isLiked ? 0 : localLikeOverride ? 1 : -1);
+
+  useEffect(() => {
+    if (!showFireBurst) return;
+    const timer = setTimeout(() => setShowFireBurst(false), FIRE_BURST_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [showFireBurst]);
+
+  function handleLikeToggle() {
+    if (isOptimistic) return;
+    requireAuth(
+      () => {
+        const next = !liked;
+        setLocalLikeOverride(next);
+        toggleLike.mutate(next, { onSettled: () => setLocalLikeOverride(null) });
+        // Sound, haptic, pulse, and the big fire burst all only ever fire
+        // on the *liking* direction -- unliking is just undoing, not a
+        // moment worth celebrating.
+        if (next) {
+          triggerHaptic();
+          playSound("like");
+          setLikePulseKey((k) => k + 1);
+          setShowFireBurst(true);
+        }
+      },
+      { message: BUZZ_LIKE_JOIN_MESSAGE }
+    );
+  }
+
+  function handleCardTouchEnd(e: React.TouchEvent) {
+    if (isOptimistic || isInteractiveTarget(e.target)) return;
+    const now = Date.now();
+    if (now - lastTapRef.current < DOUBLE_TAP_THRESHOLD_MS) {
+      lastTapRef.current = 0;
+      handleLikeToggle();
+    } else {
+      lastTapRef.current = now;
+    }
+  }
+
+  // Desktop fallback -- no touch events to time, so the native dblclick
+  // event does the same job.
+  function handleCardDoubleClick(e: React.MouseEvent) {
+    if (isOptimistic || isInteractiveTarget(e.target)) return;
+    handleLikeToggle();
+  }
 
   // moderate_buzz, not a blanket role === 'admin' check -- a sub-admin
   // without this permission gets no Pin/Delete-others'-post actions here,
@@ -108,29 +169,27 @@ export function BuzzPostCard({
     });
   }
 
-  const cardBody = (
-    <div
+  return (
+    <motion.div
+      ref={viewRef}
+      initial={animateIn ? { opacity: 0, y: 8 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: Math.min(index, 10) * 0.04, ease: [0.22, 1, 0.36, 1] }}
+      onTouchEnd={handleCardTouchEnd}
+      onDoubleClick={handleCardDoubleClick}
       className={cn(
-        "flex flex-col gap-2.5 rounded-lg p-4",
-        linkToDetail ? "bg-surface shadow-card active:scale-[0.99] transition-transform" : "bg-brand-50/40 shadow-card",
+        "relative flex flex-col gap-2.5 rounded-lg bg-surface p-4 shadow-card",
         post.isAdminPost && "border-l-4 border-brand-800",
         isOptimistic && "opacity-60"
       )}
     >
       <div className="flex items-start gap-2.5">
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-brand-800",
-            linkToDetail ? "size-9 text-body-strong" : "size-11 text-h1"
-          )}
-        >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 font-display text-body-strong text-brand-800">
           {getInitials(post.authorName, null)}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className={cn("line-clamp-1 text-ink-900", linkToDetail ? "text-body-strong" : "font-display text-h1")}>
-              {post.authorName || "Student"}
-            </span>
+            <span className="line-clamp-1 text-body-strong text-ink-900">{post.authorName || "Student"}</span>
             {isAuthorVerified && <VerifiedBadge label={authorVerificationLabel} />}
             {post.isAdminPost && (
               <Badge variant="available" size="sm">
@@ -143,93 +202,85 @@ export function BuzzPostCard({
               </Badge>
             )}
           </div>
-          <span className="flex items-center gap-1 text-caption text-ink-500">
-            {formatRelativeTime(post.createdAt)}
-            {!isOptimistic && (
-              <>
-                <span aria-hidden="true">·</span>
-                <Eye className="size-3" strokeWidth={1.75} />
-                {formatCompactCount(post.viewCount)}
-              </>
-            )}
-          </span>
+          <span className="text-caption text-ink-500">{formatRelativeTime(post.createdAt)}</span>
         </div>
+
+        {!isOptimistic && !confirmingDelete && <PostActionsMenu actions={actions} />}
       </div>
 
-      <LinkifiedContent
-        content={post.content}
-        className={linkToDetail ? "line-clamp-3" : undefined}
-        linkify={!linkToDetail}
-      />
-      {linkToDetail && post.content.length > FEED_TRUNCATION_HINT_LENGTH && (
-        <span className="-mt-1.5 text-caption font-medium text-brand-800">Show more</span>
-      )}
+      <LinkifiedContent content={post.content} />
 
       <div className="flex items-center justify-between pt-1">
-        <span className="flex items-center gap-1 text-caption text-ink-500">
-          {isOptimistic ? (
-            "Posting…"
-          ) : (
-            <>
-              <LikeButton postId={post.id} likeCount={post.likeCount} isLiked={isLiked} />
-              <BookmarkButton postId={post.id} bookmarkCount={post.bookmarkCount} isBookmarked={isBookmarked} />
-              <span className="flex items-center gap-1 px-1">
-                <MessageCircle className="size-3.5" />
-                {post.replyCount}
-              </span>
-              <ShareButton postId={post.id} content={post.content} />
-            </>
-          )}
-        </span>
-
-        {confirmingDelete ? (
+        {isOptimistic ? (
+          <span className="text-caption text-ink-500">Posting…</span>
+        ) : confirmingDelete ? (
           <span className="flex items-center gap-2">
-            <button
-              type="button"
-              className="text-caption text-ink-500"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setConfirmingDelete(false);
-              }}
-            >
+            <button type="button" className="text-caption text-ink-500" onClick={() => setConfirmingDelete(false)}>
               Cancel
             </button>
             <button
               type="button"
               className="text-caption font-medium text-danger"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                deletePost.mutate(post.id);
-              }}
+              onClick={() => deletePost.mutate(post.id)}
             >
               {deletePost.isPending ? "Deleting..." : "Delete"}
             </button>
           </span>
         ) : (
-          <PostActionsMenu actions={actions} />
+          <span className="flex items-center gap-1 text-caption text-ink-500">
+            <span className="flex items-center gap-1 px-1 text-[#94A3B8]">
+              <Eye className="size-3.5" strokeWidth={1.75} />
+              {formatCompactCount(post.viewCount)}
+            </span>
+            <LikeButton liked={liked} displayCount={displayLikeCount} pulseKey={likePulseKey} onTap={handleLikeToggle} />
+            <button
+              type="button"
+              aria-label="Reply to this post"
+              onClick={() => setRepliesOpen(true)}
+              className="flex items-center gap-1 rounded-pill px-2 py-1 text-caption font-medium text-ink-500"
+            >
+              <MessageCircle className="size-3.5" strokeWidth={1.75} />
+              {post.replyCount}
+            </button>
+            <button
+              type="button"
+              aria-label="Save post as image"
+              disabled={isSaving}
+              onClick={() => saveAsImage(post, { isAuthorVerified })}
+              className="flex items-center gap-1 rounded-pill px-2 py-1 text-caption font-medium text-[#94A3B8] disabled:opacity-50"
+            >
+              <Download className="size-4" strokeWidth={1.75} />
+            </button>
+            <ShareButton postId={post.id} content={post.content} />
+          </span>
         )}
       </div>
-    </div>
-  );
 
-  return (
-    <motion.div
-      ref={viewRef}
-      initial={animateIn ? { opacity: 0, y: 8 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, delay: Math.min(index, 10) * 0.04, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {linkToDetail && !isOptimistic ? (
-        <Link href={`/buzz/${post.id}`} className="block">
-          {cardBody}
-        </Link>
-      ) : (
-        cardBody
-      )}
+      <AnimatePresence>
+        {showFireBurst && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1.5, transition: { type: "spring", stiffness: 260, damping: 14 } }}
+            exit={{ opacity: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            aria-hidden
+          >
+            <span style={{ fontSize: 96, lineHeight: 1 }}>🔥</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!isOptimistic && (
-        <ReportBuzzSheet open={reportOpen} onClose={() => setReportOpen(false)} postId={post.id} />
+        <>
+          <ReplySheet
+            post={post}
+            open={repliesOpen}
+            onClose={() => setRepliesOpen(false)}
+            isAuthorVerified={isAuthorVerified}
+            authorVerificationLabel={authorVerificationLabel}
+          />
+          <ReportBuzzSheet open={reportOpen} onClose={() => setReportOpen(false)} postId={post.id} />
+        </>
       )}
     </motion.div>
   );

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { createMarketListing, type CreateMarketListingInput } from "@/lib/queries/market";
+import { playSound } from "@/lib/sounds";
 
 export type SubmitMarketListingVars = Omit<CreateMarketListingInput, "sellerId">;
 
@@ -23,6 +24,7 @@ export function useCreateMarketListing() {
       return createMarketListing(supabase, { ...input, sellerId: user.id });
     },
     onSuccess: () => {
+      playSound("success");
       queryClient.invalidateQueries({ queryKey: ["market-feed"] });
       queryClient.invalidateQueries({ queryKey: ["my-market-listings"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });

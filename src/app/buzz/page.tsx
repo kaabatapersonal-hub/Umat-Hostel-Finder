@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, Flame, Clock, MessageSquare, Pin, Plus } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,7 +14,6 @@ import { usePinnedBuzzPosts } from "@/hooks/use-pinned-buzz-posts";
 import { useVerifiedProfiles } from "@/hooks/use-verified-profiles";
 import { useMyLikedPosts } from "@/hooks/use-my-liked-posts";
 import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
-import { useMyBookmarkedPosts } from "@/hooks/use-my-bookmarked-posts";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,20 @@ const BUZZ_TAB_STORAGE_KEY = "campa-buzz-tab";
 
 type BuzzTab = "hot" | "new";
 
+// useSearchParams (for the ?post= shared-link highlight) opts this page
+// out of static rendering unless it's wrapped in Suspense -- the fallback
+// here is never actually visible in practice (client navigation to /buzz
+// already has the params available before first paint), it's just what
+// Next.js requires to keep the rest of the route statically generated.
 export default function BuzzPage() {
+  return (
+    <Suspense fallback={null}>
+      <BuzzFeed />
+    </Suspense>
+  );
+}
+
+function BuzzFeed() {
   const { requireAuth } = useAuth();
   const [composeOpen, setComposeOpen] = useState(false);
   // Starts at "hot" (the default, and what a static/SSR render always
@@ -88,7 +101,23 @@ export default function BuzzPage() {
   const { data: verifiedMap } = useVerifiedProfiles(authorIds);
   const { data: likedPostIds } = useMyLikedPosts(postIds);
   const { data: myReports } = useMyBuzzReports();
-  const { data: bookmarkedPostIds } = useMyBookmarkedPosts(postIds);
+
+  // A shared post link (or an old bookmarked /buzz/[id] URL) redirects
+  // here with ?post={id} -- best-effort scroll-to/highlight if that post
+  // happens to already be loaded on this page; if it's further back than
+  // the current page of results, this is a no-op rather than triggering
+  // extra fetches just to find it (see src/app/buzz/[id]/page.tsx).
+  const searchParams = useSearchParams();
+  const highlightPostId = searchParams.get("post");
+  const hasScrolledToHighlightRef = useRef(false);
+
+  useEffect(() => {
+    if (!highlightPostId || hasScrolledToHighlightRef.current) return;
+    const el = document.querySelector(`[data-post-id="${highlightPostId}"]`);
+    if (!el) return;
+    hasScrolledToHighlightRef.current = true;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightPostId, posts, pinnedQuery.data]);
 
   async function handleRefresh() {
     await Promise.all([refetch(), pinnedQuery.refetch()]);
@@ -96,17 +125,24 @@ export default function BuzzPage() {
 
   function renderPost(post: (typeof posts)[number], i: number) {
     return (
-      <BuzzPostCard
+      <div
         key={post.id}
-        post={post}
-        index={i}
-        animateIn={!isFirstPaintRef.current}
-        isAuthorVerified={verifiedMap?.has(post.authorId) ?? false}
-        authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
-        isLiked={likedPostIds?.has(post.id) ?? false}
-        isReported={myReports?.postIds.has(post.id) ?? false}
-        isBookmarked={bookmarkedPostIds?.has(post.id) ?? false}
-      />
+        data-post-id={post.id}
+        className={cn(
+          "rounded-lg transition-shadow",
+          highlightPostId === post.id && "ring-2 ring-gold-500 ring-offset-2"
+        )}
+      >
+        <BuzzPostCard
+          post={post}
+          index={i}
+          animateIn={!isFirstPaintRef.current}
+          isAuthorVerified={verifiedMap?.has(post.authorId) ?? false}
+          authorVerificationLabel={verifiedMap?.get(post.authorId) ?? null}
+          isLiked={likedPostIds?.has(post.id) ?? false}
+          isReported={myReports?.postIds.has(post.id) ?? false}
+        />
+      </div>
     );
   }
 

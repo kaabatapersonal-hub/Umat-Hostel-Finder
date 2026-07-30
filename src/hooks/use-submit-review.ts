@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { createReview, updateReview } from "@/lib/queries/reviews";
+import { playSound } from "@/lib/sounds";
 
 export interface SubmitReviewVars {
   hostelId: string;
@@ -34,6 +35,7 @@ export function useSubmitReview() {
       return createReview(supabase, { hostelId, authorId: user.id, rating, comment, reviewerName });
     },
     onSuccess: (_review, { hostelId }) => {
+      playSound("success");
       queryClient.invalidateQueries({ queryKey: ["reviews", hostelId] });
       queryClient.invalidateQueries({ queryKey: ["my-review", hostelId] });
       // The rating_avg/rating_count shown in the header are cached columns

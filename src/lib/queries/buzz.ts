@@ -10,13 +10,12 @@ export interface BuzzPost {
   isPinned: boolean;
   replyCount: number;
   likeCount: number;
-  bookmarkCount: number;
   viewCount: number;
   createdAt: string;
 }
 
 const BUZZ_POST_COLUMNS =
-  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, like_count, bookmark_count, view_count, created_at";
+  "id, author_id, author_name, content, is_admin_post, is_pinned, reply_count, like_count, view_count, created_at";
 
 interface BuzzPostRow {
   id: string;
@@ -27,7 +26,6 @@ interface BuzzPostRow {
   is_pinned: boolean;
   reply_count: number;
   like_count: number;
-  bookmark_count: number;
   view_count: number;
   created_at: string;
 }
@@ -42,7 +40,6 @@ function mapBuzzPost(row: BuzzPostRow): BuzzPost {
     isPinned: row.is_pinned,
     replyCount: row.reply_count,
     likeCount: row.like_count,
-    bookmarkCount: row.bookmark_count,
     viewCount: row.view_count,
     createdAt: row.created_at,
   };
@@ -142,16 +139,6 @@ export async function getPinnedBuzzPosts(supabase: SupabaseClient<Database>): Pr
 
   if (error) throw error;
   return (data ?? []).map(mapBuzzPost);
-}
-
-export async function getBuzzPostById(supabase: SupabaseClient<Database>, id: string): Promise<BuzzPost | null> {
-  const { data, error } = await supabase.from("buzz_posts").select(BUZZ_POST_COLUMNS).eq("id", id).maybeSingle();
-
-  if (error) {
-    if (error.code === "22P02") return null;
-    throw error;
-  }
-  return data ? mapBuzzPost(data) : null;
 }
 
 export async function createBuzzPost(
@@ -437,88 +424,6 @@ export async function resolveBuzzReport(
 ): Promise<void> {
   const { error } = await supabase.rpc("resolve_buzz_report", { p_report_id: reportId, p_action: action });
   if (error) throw error;
-}
-
-// =========================================================================
-// Bookmarks (Session A.5)
-// =========================================================================
-
-export async function bookmarkBuzzPost(supabase: SupabaseClient<Database>, postId: string, userId: string): Promise<void> {
-  const { error } = await supabase.from("buzz_bookmarks").insert({ post_id: postId, user_id: userId });
-  if (error) throw error;
-}
-
-export async function unbookmarkBuzzPost(supabase: SupabaseClient<Database>, postId: string, userId: string): Promise<void> {
-  const { error } = await supabase.from("buzz_bookmarks").delete().eq("post_id", postId).eq("user_id", userId);
-  if (error) throw error;
-}
-
-// Batched (one query for every post currently on screen), same shape as
-// getMyLikedPostIds/getVerifiedProfiles -- never one query per card.
-export async function getMyBookmarkedPostIds(
-  supabase: SupabaseClient<Database>,
-  postIds: string[],
-  userId: string
-): Promise<Set<string>> {
-  if (postIds.length === 0) return new Set();
-
-  const { data, error } = await supabase.from("buzz_bookmarks").select("post_id").eq("user_id", userId).in("post_id", postIds);
-
-  if (error) throw error;
-  return new Set((data ?? []).map((row) => row.post_id));
-}
-
-export interface SavedBuzzCursor {
-  createdAt: string;
-  id: string;
-}
-
-export interface GetSavedBuzzPostsResult {
-  posts: BuzzPost[];
-  nextCursor: SavedBuzzCursor | null;
-}
-
-// Two-step (bookmarks, then a batched buzz_posts lookup), not an embedded
-// PostgREST join -- same posture as getAdminBuzzReports: simpler to
-// reason about, and doesn't depend on this project's hand-maintained
-// Database types matching PostgREST's embedded-relationship shape
-// exactly. Cursor is on the *bookmark's* created_at (when it was saved),
-// not the post's -- "most recently saved first," per the brief.
-export async function getSavedBuzzPosts(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  { cursor, limit = BUZZ_PAGE_SIZE }: { cursor?: SavedBuzzCursor | null; limit?: number } = {}
-): Promise<GetSavedBuzzPostsResult> {
-  let bookmarksQuery = supabase
-    .from("buzz_bookmarks")
-    .select("id, post_id, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(limit);
-
-  if (cursor) {
-    bookmarksQuery = bookmarksQuery.or(`created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`);
-  }
-
-  const { data: bookmarks, error: bookmarksError } = await bookmarksQuery;
-  if (bookmarksError) throw bookmarksError;
-
-  if (!bookmarks || bookmarks.length === 0) return { posts: [], nextCursor: null };
-
-  const postIds = bookmarks.map((b) => b.post_id);
-  const { data: postRows, error: postsError } = await supabase.from("buzz_posts").select(BUZZ_POST_COLUMNS).in("id", postIds);
-  if (postsError) throw postsError;
-
-  const postById = new Map((postRows ?? []).map((row) => [row.id, mapBuzzPost(row)]));
-  // Preserve bookmark order (most recently saved first) -- not whatever
-  // order the second query's IN clause happened to return rows in.
-  const posts = bookmarks.map((b) => postById.get(b.post_id)).filter((p): p is BuzzPost => !!p);
-
-  const last = bookmarks[bookmarks.length - 1];
-  const nextCursor = bookmarks.length === limit && last ? { createdAt: last.created_at, id: last.id } : null;
-
-  return { posts, nextCursor };
 }
 
 // =========================================================================

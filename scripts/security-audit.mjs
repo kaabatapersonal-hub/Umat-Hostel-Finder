@@ -1391,125 +1391,28 @@ async function main() {
   }
 
   // =====================================================================
-  // Bookmarks / private saves (Buzz v2.5)
+  // Feed-only redirect (Session B) -- /buzz/[id] no longer exists as a
+  // page; it 307s into /buzz?post={id} instead of 404ing, so an old
+  // shared/bookmarked link still lands somewhere real. This is a plain
+  // Next.js route redirect, not a Supabase-enforced check, so it's only
+  // testable when the app's own server is reachable (same caveat as the
+  // submission-notify endpoint check at the end of this script).
   // =====================================================================
-  section("buzz: bookmarks (Buzz v2.5)");
+  section("buzz: feed-only redirect (Session B)");
   {
-    const bookmarkPost = await post(
-      strangerToken,
-      "/buzz_posts",
-      { author_id: strangerUid, content: "[Buzz Audit] Bookmarks test post" },
-      "return=representation"
-    );
-    const bookmarkPostId = bookmarkPost.body?.[0]?.id;
-
-    const anonDirectInsert = await post(null, "/buzz_bookmarks", { post_id: bookmarkPostId, user_id: strangerUid });
-    check("anon cannot insert a bookmark directly", !anonDirectInsert.ok, `status ${anonDirectInsert.status}`);
-
-    const firstBookmark = await post(
-      strangerToken,
-      "/buzz_bookmarks",
-      { post_id: bookmarkPostId, user_id: strangerUid },
-      "return=representation"
-    );
-    check("stranger can bookmark a post", firstBookmark.ok, JSON.stringify(firstBookmark.body));
-
-    const countAfterBookmark = await get(adminToken, `/buzz_posts?id=eq.${bookmarkPostId}&select=bookmark_count`);
-    check(
-      "bookmark_count reflects the new bookmark",
-      countAfterBookmark.body?.[0]?.bookmark_count === 1,
-      JSON.stringify(countAfterBookmark.body)
-    );
-
-    if (hasDistinctOwner) {
-      const otherReadsBookmark = await get(ownerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&user_id=eq.${strangerUid}&select=id`);
+    const appUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    try {
+      const res = await fetch(`${appUrl}/buzz/00000000-0000-0000-0000-000000000000`, { redirect: "manual" });
+      const isRedirect = res.status >= 300 && res.status < 400;
+      const location = res.headers.get("location") ?? "";
       check(
-        "a different user cannot read someone else's bookmark row (saved-posts privacy)",
-        (otherReadsBookmark.body ?? []).length === 0,
-        JSON.stringify(otherReadsBookmark.body)
+        "/buzz/[id] redirects into the feed instead of 404ing",
+        isRedirect && location.includes("/buzz?post="),
+        `status ${res.status}, location ${location}`
       );
-
-      const otherFiltersOwnQueryToStranger = await get(ownerToken, `/buzz_bookmarks?user_id=eq.${strangerUid}&select=id`);
-      check(
-        "a different user's own-bookmarks query cannot see the stranger's bookmarks even when filtered by the stranger's user_id",
-        (otherFiltersOwnQueryToStranger.body ?? []).length === 0,
-        JSON.stringify(otherFiltersOwnQueryToStranger.body)
-      );
-    } else {
-      skip("a different user cannot read someone else's bookmark row (saved-posts privacy)", "owner account not confirmed -- no second distinct identity available");
+    } catch {
+      skip("/buzz/[id] redirects into the feed instead of 404ing", `couldn't reach ${appUrl} -- is the app running?`);
     }
-
-    const ownerReadsOwn = await get(strangerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&user_id=eq.${strangerUid}&select=id`);
-    check("the bookmarking user CAN read their own bookmark row", ownerReadsOwn.body?.length === 1, JSON.stringify(ownerReadsOwn.body));
-
-    const unbookmark = await del(strangerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&user_id=eq.${strangerUid}`);
-    check("stranger can remove their own bookmark", unbookmark.ok, `status ${unbookmark.status}`);
-
-    const countAfterUnbookmark = await get(adminToken, `/buzz_posts?id=eq.${bookmarkPostId}&select=bookmark_count`);
-    check(
-      "bookmark_count drops back to 0 after unbookmarking",
-      countAfterUnbookmark.body?.[0]?.bookmark_count === 0,
-      JSON.stringify(countAfterUnbookmark.body)
-    );
-
-    const spoofBookmarkUser = await post(strangerToken, "/buzz_bookmarks", { post_id: bookmarkPostId, user_id: admin.user.id });
-    check("stranger cannot spoof user_id on a bookmark", !spoofBookmarkUser.ok, `status ${spoofBookmarkUser.status}`);
-
-    const realBookmark = await post(
-      strangerToken,
-      "/buzz_bookmarks",
-      { post_id: bookmarkPostId, user_id: strangerUid },
-      "return=representation"
-    );
-    const duplicateBookmark = await post(strangerToken, "/buzz_bookmarks", { post_id: bookmarkPostId, user_id: strangerUid });
-    check(
-      "the same user bookmarking the same post twice is rejected (unique constraint)",
-      realBookmark.ok && !duplicateBookmark.ok,
-      `status ${duplicateBookmark.status}`
-    );
-
-    if (hasDistinctOwner) {
-      const otherDeletesBookmark = await del(ownerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&user_id=eq.${strangerUid}`);
-      // Verified via strangerToken, not adminToken -- the own-only SELECT
-      // policy means even admin can't see another user's bookmark row
-      // (that's the point: "who bookmarked" is private, no admin carve-out
-      // was asked for), so only the actual owner can confirm it's still there.
-      const bookmarkStillExists = await get(strangerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&user_id=eq.${strangerUid}&select=id`);
-      check(
-        "a different user cannot delete someone else's bookmark",
-        bookmarkStillExists.body?.length === 1,
-        JSON.stringify(bookmarkStillExists.body)
-      );
-    } else {
-      skip("a different user cannot delete someone else's bookmark", "owner account not confirmed -- no second distinct identity available");
-    }
-
-    // Suspend enforcement, same posture as likes/reports.
-    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: true });
-    const suspendedBookmarkAttempt = await post(strangerToken, "/buzz_bookmarks", { post_id: bookmarkPostId, user_id: strangerUid });
-    check(
-      "a suspended account's existing session cannot bookmark a post",
-      !suspendedBookmarkAttempt.ok,
-      `status ${suspendedBookmarkAttempt.status}`
-    );
-    await rpc(adminToken, "set_user_suspended", { p_user_id: strangerUid, p_suspended: false });
-
-    // Deleting the post cascades to its bookmarks (unlike reports, a
-    // bookmark is meaningless without its post -- no audit trail concern).
-    // Checked via strangerToken -- same own-only-SELECT reasoning as above.
-    const cascadeCheck = await get(strangerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&select=id`);
-    const cascadeHadRows = (cascadeCheck.body ?? []).length > 0;
-    if (bookmarkPostId) await del(adminToken, `/buzz_posts?id=eq.${bookmarkPostId}`);
-    const cascadeAfterDelete = await get(strangerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}&select=id`);
-    check(
-      "deleting a post cascades to delete its bookmarks (ON DELETE CASCADE)",
-      cascadeHadRows && (cascadeAfterDelete.body ?? []).length === 0,
-      JSON.stringify(cascadeAfterDelete.body)
-    );
-
-    // Cleanup (post already deleted above; drops any leftover bookmark rows
-    // from a failed cascade so this section can't pollute the next run).
-    await del(strangerToken, `/buzz_bookmarks?post_id=eq.${bookmarkPostId}`);
   }
 
   // =====================================================================

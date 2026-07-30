@@ -7,6 +7,7 @@ import { createBuzzPost, type BuzzPost, type GetBuzzFeedResult } from "@/lib/que
 import { useAuth } from "@/providers/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { captureEvent } from "@/lib/analytics";
+import { playSound } from "@/lib/sounds";
 
 type BuzzFeedCache = InfiniteData<GetBuzzFeedResult>;
 
@@ -61,7 +62,6 @@ export function useCreateBuzzPost() {
         isPinned: false,
         replyCount: 0,
         likeCount: 0,
-        bookmarkCount: 0,
         viewCount: 0,
         createdAt: new Date().toISOString(),
       };
@@ -105,6 +105,7 @@ export function useCreateBuzzPost() {
       queryClient.invalidateQueries({ queryKey: ["buzz-feed-hot"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       captureEvent("posted_buzz", { post_id: newPost.id });
+      playSound("send");
     },
   });
 

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createBuzzReply, type BuzzReply, type GetBuzzRepliesResult } from "@/lib/queries/buzz";
 import { useAuth } from "@/providers/auth-provider";
 import { useToast } from "@/components/ui/toast";
+import { playSound } from "@/lib/sounds";
 
 type BuzzRepliesCache = InfiniteData<GetBuzzRepliesResult>;
 type CreateReplyInput = { postId: string; content: string; gifUrl?: string | null };
@@ -82,6 +83,7 @@ export function useCreateBuzzReply() {
       queryClient.invalidateQueries({ queryKey: ["buzz-post", postId] });
       queryClient.invalidateQueries({ queryKey: ["buzz-feed"] });
       queryClient.invalidateQueries({ queryKey: ["buzz-pinned"] });
+      playSound("send");
     },
     onSettled: (_reply, _err, { postId }) => {
       // Belt-and-suspenders reconciliation, same posture as
