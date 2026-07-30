@@ -75,7 +75,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-surface-muted">
-      <header className="border-b border-line bg-surface px-4 py-3 sm:px-6">
+      <header
+        className="border-b border-line bg-surface px-4 pb-3 sm:px-6"
+        style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}
+      >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-h1 text-ink-900">Admin</span>
