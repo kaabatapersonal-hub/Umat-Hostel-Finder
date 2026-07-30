@@ -1,6 +1,6 @@
 "use client";
 
-import { Share } from "lucide-react";
+import { Forward } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 
 export interface ShareButtonProps {
@@ -68,7 +68,7 @@ export function ShareButton({ postId, content }: ShareButtonProps) {
       onClick={handleTap}
       className="flex items-center gap-1 rounded-pill px-2 py-1 text-caption font-medium text-[#94A3B8] transition-colors"
     >
-      <Share className="size-4" strokeWidth={1.75} />
+      <Forward className="size-4" strokeWidth={1.75} />
     </button>
   );
 }

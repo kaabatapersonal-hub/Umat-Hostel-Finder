@@ -34,7 +34,10 @@ export function LikeButton({ liked, displayCount, pulseKey, onTap }: LikeButtonP
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
         className="flex"
       >
-        <Flame className={cn("size-4", liked ? "fill-gold-500 text-gold-500" : "text-[#94A3B8]")} strokeWidth={1.75} />
+        {/* Deliberately bigger than every other action-row icon -- liking
+            is the primary action here, and should read as the visual
+            anchor of the row, not just another same-sized icon. */}
+        <Flame className={cn("size-6", liked ? "fill-gold-500 text-gold-500" : "text-[#94A3B8]")} strokeWidth={1.75} />
       </motion.span>
       {displayCount > 0 && <span className={liked ? "text-gold-600" : "text-ink-500"}>{displayCount}</span>}
     </button>
