@@ -687,6 +687,72 @@ export interface Database {
           },
         ];
       };
+      notifications: {
+        Row: {
+          id: string;
+          recipient_id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          actor_id: string | null;
+          actor_name: string | null;
+          reference_type: string | null;
+          reference_id: string | null;
+          group_key: string | null;
+          group_count: number;
+          is_read: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          recipient_id: string;
+          type: string;
+          title: string;
+          body?: string | null;
+          actor_id?: string | null;
+          actor_name?: string | null;
+          reference_type?: string | null;
+          reference_id?: string | null;
+          group_key?: string | null;
+          group_count?: number;
+          is_read?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          recipient_id?: string;
+          type?: string;
+          title?: string;
+          body?: string | null;
+          actor_id?: string | null;
+          actor_name?: string | null;
+          reference_type?: string | null;
+          reference_id?: string | null;
+          group_key?: string | null;
+          group_count?: number;
+          is_read?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       market_listings: {
         Row: {
           id: string;
@@ -962,6 +1028,18 @@ export interface Database {
         Args: { p_post_id: string };
         Returns: undefined;
       };
+      mark_notification_read: {
+        Args: { p_notification_id: string };
+        Returns: undefined;
+      };
+      mark_all_notifications_read: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      get_unread_notifications_count: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
       set_leaving_campus_mode: {
         Args: { p_enabled: boolean; p_leaving_date?: string | null };
         Returns: undefined;
@@ -988,6 +1066,7 @@ export type ProfileRole = "student" | "admin";
 // checked via is_super_admin() directly, not the permission array.
 export type AdminPermission = "manage_hostels" | "manage_users" | "moderate_buzz" | "moderate_reviews" | "moderate_market";
 export type SubmissionStatus = "pending" | "approved" | "rejected";
+export type NotificationType = "buzz_reply" | "buzz_like" | "buzz_pin" | "hostel_update" | "admin_report" | "welcome";
 export type RoommateRequestStatus = "pending" | "accepted" | "declined";
 export type MarketCategory =
   | "hostel_essentials"

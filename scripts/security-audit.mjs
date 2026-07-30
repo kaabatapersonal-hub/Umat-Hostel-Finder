@@ -1518,6 +1518,271 @@ async function main() {
   }
 
   // =====================================================================
+  // notifications (platform-wide notification system)
+  // =====================================================================
+  section("notifications");
+  {
+    // RLS filtering a SELECT to zero rows is still a 200 with an empty
+    // body, not an error status -- same reasoning as the existing "a
+    // different non-admin cannot read someone else's report" check.
+    const anonReadsNotifications = await get(null, "/notifications?select=id&limit=1");
+    check(
+      "anon cannot read notifications",
+      anonReadsNotifications.ok && (anonReadsNotifications.body ?? []).length === 0,
+      `status ${anonReadsNotifications.status}, body ${JSON.stringify(anonReadsNotifications.body)}`
+    );
+
+    const strangerOwnNotifications = await get(strangerToken, "/notifications?select=id&limit=1");
+    check(
+      "stranger can read their own notifications (e.g. their welcome notification)",
+      strangerOwnNotifications.ok,
+      `status ${strangerOwnNotifications.status}`
+    );
+
+    const directInsertAttempt = await post(strangerToken, "/notifications", {
+      recipient_id: strangerUid,
+      type: "welcome",
+      title: "Fake client-inserted notification",
+    });
+    check(
+      "no client (not even the recipient) can insert a notification directly -- only triggers can",
+      !directInsertAttempt.ok,
+      `status ${directInsertAttempt.status}`
+    );
+
+    // -------------------------------------------------------------------
+    // Trigger A: buzz_reply -> notify post author (and never self-notify)
+    // -------------------------------------------------------------------
+    const replyNotifyPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Notif Audit] Reply-notification test post" },
+      "return=representation"
+    );
+    const replyNotifyPostId = replyNotifyPost.body?.[0]?.id;
+
+    // Stranger replying to their own post must NOT notify themselves.
+    const selfReply = await post(strangerToken, "/buzz_replies", {
+      post_id: replyNotifyPostId,
+      author_id: strangerUid,
+      content: "Replying to my own post",
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    const selfReplyNotifications = await get(
+      strangerToken,
+      `/notifications?type=eq.buzz_reply&reference_id=eq.${replyNotifyPostId}&select=id`
+    );
+    check(
+      "replying to your own post does not create a self-notification",
+      selfReply.ok && (selfReplyNotifications.body ?? []).length === 0,
+      JSON.stringify(selfReplyNotifications.body)
+    );
+
+    if (hasDistinctOwner) {
+      const ownerReply = await post(ownerToken, "/buzz_replies", {
+        post_id: replyNotifyPostId,
+        author_id: ownerUid,
+        content: "A real reply from a different user",
+      });
+      await new Promise((r) => setTimeout(r, 300));
+      const replyNotification = await get(
+        strangerToken,
+        `/notifications?type=eq.buzz_reply&reference_id=eq.${replyNotifyPostId}&select=id,title,actor_id,is_read`
+      );
+      check(
+        "a reply from a different user DOES notify the post author",
+        ownerReply.ok && (replyNotification.body ?? []).some((n) => n.actor_id === ownerUid && !n.is_read),
+        JSON.stringify(replyNotification.body)
+      );
+    } else {
+      skip("a reply from a different user DOES notify the post author", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    // -------------------------------------------------------------------
+    // Trigger B: buzz_like -> notify post author, batched
+    // -------------------------------------------------------------------
+    const likeNotifyPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Notif Audit] Like-notification test post" },
+      "return=representation"
+    );
+    const likeNotifyPostId = likeNotifyPost.body?.[0]?.id;
+
+    const selfLike = await post(strangerToken, "/buzz_likes", { post_id: likeNotifyPostId, user_id: strangerUid });
+    await new Promise((r) => setTimeout(r, 300));
+    const selfLikeNotifications = await get(
+      strangerToken,
+      `/notifications?type=eq.buzz_like&reference_id=eq.${likeNotifyPostId}&select=id`
+    );
+    check(
+      "liking your own post does not create a self-notification",
+      selfLike.ok && (selfLikeNotifications.body ?? []).length === 0,
+      JSON.stringify(selfLikeNotifications.body)
+    );
+    await del(adminToken, `/buzz_likes?post_id=eq.${likeNotifyPostId}&user_id=eq.${strangerUid}`);
+
+    if (hasDistinctOwner) {
+      await post(ownerToken, "/buzz_likes", { post_id: likeNotifyPostId, user_id: ownerUid });
+      await new Promise((r) => setTimeout(r, 300));
+      const likeNotification = await get(
+        strangerToken,
+        `/notifications?type=eq.buzz_like&reference_id=eq.${likeNotifyPostId}&select=id,group_key,group_count`
+      );
+      const firstLikeRow = likeNotification.body?.[0];
+      check(
+        "a like from a different user notifies the post author, group_count starts at 1",
+        firstLikeRow?.group_key === `buzz_like:${likeNotifyPostId}` && firstLikeRow?.group_count === 1,
+        JSON.stringify(likeNotification.body)
+      );
+
+      // A second liker within the batching window should update the SAME
+      // row (group_count -> 2), not create a second one.
+      await post(adminToken, "/buzz_likes", { post_id: likeNotifyPostId, user_id: admin.user.id });
+      await new Promise((r) => setTimeout(r, 300));
+      const afterSecondLike = await get(
+        strangerToken,
+        `/notifications?type=eq.buzz_like&reference_id=eq.${likeNotifyPostId}&select=id,group_count`
+      );
+      check(
+        "a second like batches into the same notification (group_count -> 2), not a second row",
+        (afterSecondLike.body ?? []).length === 1 && afterSecondLike.body?.[0]?.group_count === 2,
+        JSON.stringify(afterSecondLike.body)
+      );
+
+      await del(adminToken, `/buzz_likes?post_id=eq.${likeNotifyPostId}`);
+    } else {
+      skip("a like from a different user notifies the post author, batched", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    await del(adminToken, `/buzz_posts?id=eq.${replyNotifyPostId}`);
+    await del(adminToken, `/buzz_posts?id=eq.${likeNotifyPostId}`);
+
+    // -------------------------------------------------------------------
+    // Trigger C: buzz_pin -> notify post author
+    // -------------------------------------------------------------------
+    const pinNotifyPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Notif Audit] Pin-notification test post" },
+      "return=representation"
+    );
+    const pinNotifyPostId = pinNotifyPost.body?.[0]?.id;
+    await patch(adminToken, `/buzz_posts?id=eq.${pinNotifyPostId}`, { is_pinned: true });
+    await new Promise((r) => setTimeout(r, 300));
+    const pinNotification = await get(strangerToken, `/notifications?type=eq.buzz_pin&reference_id=eq.${pinNotifyPostId}&select=id,actor_id,title`);
+    check(
+      "pinning a post notifies its author, with no actor (system notification)",
+      (pinNotification.body ?? []).some((n) => n.actor_id === null),
+      JSON.stringify(pinNotification.body)
+    );
+    await del(adminToken, `/buzz_posts?id=eq.${pinNotifyPostId}`);
+
+    // -------------------------------------------------------------------
+    // Trigger E: buzz_report -> notify admins with moderate_buzz
+    // -------------------------------------------------------------------
+    const reportNotifyPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Notif Audit] Report-notification test post" },
+      "return=representation"
+    );
+    const reportNotifyPostId = reportNotifyPost.body?.[0]?.id;
+    const reportForNotify = await post(
+      strangerToken,
+      "/buzz_reports",
+      { reporter_id: strangerUid, post_id: reportNotifyPostId, reason: "spam" },
+      "return=representation"
+    );
+    const reportForNotifyId = reportForNotify.body?.[0]?.id;
+    await new Promise((r) => setTimeout(r, 300));
+    const adminReportNotification = await get(
+      adminToken,
+      `/notifications?type=eq.admin_report&reference_id=eq.${reportForNotifyId}&select=id,actor_id,title`
+    );
+    check(
+      "a new report notifies the (super) admin, who has moderate_buzz",
+      adminReportNotification.ok && (adminReportNotification.body ?? []).some((n) => n.actor_id === strangerUid),
+      JSON.stringify(adminReportNotification.body)
+    );
+    await rpc(adminToken, "resolve_buzz_report", { p_report_id: reportForNotifyId, p_action: "dismiss" });
+    await del(adminToken, `/buzz_posts?id=eq.${reportNotifyPostId}`);
+
+    // -------------------------------------------------------------------
+    // mark_notification_read / mark_all_notifications_read / unread count
+    // -------------------------------------------------------------------
+    // A dedicated fresh notification for this check specifically -- every
+    // notification created by the trigger tests above already got cleaned
+    // up by handle_buzz_post_deleted_cleanup_notifications the moment
+    // this script deleted its underlying test post (working as intended,
+    // but it means none of those survive to be read here).
+    let markReadTestPostId;
+    if (hasDistinctOwner) {
+      const markReadTestPost = await post(
+        strangerToken,
+        "/buzz_posts",
+        { author_id: strangerUid, content: "[Notif Audit] mark_notification_read test post" },
+        "return=representation"
+      );
+      markReadTestPostId = markReadTestPost.body?.[0]?.id;
+      await post(ownerToken, "/buzz_replies", {
+        post_id: markReadTestPostId,
+        author_id: ownerUid,
+        content: "Reply to generate a fresh unread notification",
+      });
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    const strangerNotifBefore = await get(strangerToken, `/notifications?recipient_id=eq.${strangerUid}&is_read=eq.false&select=id&limit=1`);
+    const someUnreadId = strangerNotifBefore.body?.[0]?.id;
+
+    if (someUnreadId && hasDistinctOwner) {
+      const otherMarksRead = await rpc(ownerToken, "mark_notification_read", { p_notification_id: someUnreadId });
+      const stillUnread = await get(strangerToken, `/notifications?id=eq.${someUnreadId}&select=is_read`);
+      check(
+        "a different user calling mark_notification_read on someone else's notification has no effect",
+        otherMarksRead.ok && stillUnread.body?.[0]?.is_read === false,
+        JSON.stringify(stillUnread.body)
+      );
+    } else if (!someUnreadId) {
+      skip("a different user calling mark_notification_read on someone else's notification has no effect", "no unread notification available to test against");
+    } else {
+      skip("a different user calling mark_notification_read on someone else's notification has no effect", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    if (someUnreadId) {
+      const countBefore = await rpc(strangerToken, "get_unread_notifications_count", {});
+      const ownMarksRead = await rpc(strangerToken, "mark_notification_read", { p_notification_id: someUnreadId });
+      const countAfter = await rpc(strangerToken, "get_unread_notifications_count", {});
+      check(
+        "the recipient CAN mark their own notification read, and the unread count drops by exactly 1",
+        ownMarksRead.ok && typeof countBefore.body === "number" && countAfter.body === countBefore.body - 1,
+        `before ${JSON.stringify(countBefore.body)}, after ${JSON.stringify(countAfter.body)}`
+      );
+    }
+
+    // mark_all_notifications_read must only ever touch the caller's own rows.
+    if (hasDistinctOwner) {
+      const ownerUnreadBefore = await rpc(ownerToken, "get_unread_notifications_count", {});
+      const strangerUnreadBefore = await rpc(strangerToken, "get_unread_notifications_count", {});
+      await rpc(ownerToken, "mark_all_notifications_read", {});
+      const ownerUnreadAfter = await rpc(ownerToken, "get_unread_notifications_count", {});
+      const strangerUnreadAfter = await rpc(strangerToken, "get_unread_notifications_count", {});
+      check(
+        "mark_all_notifications_read zeroes out the caller's own unread count without touching another user's",
+        ownerUnreadAfter.body === 0 && strangerUnreadAfter.body === strangerUnreadBefore.body,
+        `owner: ${JSON.stringify(ownerUnreadBefore.body)} -> ${JSON.stringify(ownerUnreadAfter.body)}, stranger untouched: ${JSON.stringify(strangerUnreadBefore.body)} -> ${JSON.stringify(strangerUnreadAfter.body)}`
+      );
+    } else {
+      skip("mark_all_notifications_read zeroes out the caller's own unread count without touching another user's", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    // Cleanup -- also cascade-deletes this section's own notification via
+    // handle_buzz_post_deleted_cleanup_notifications.
+    if (markReadTestPostId) await del(adminToken, `/buzz_posts?id=eq.${markReadTestPostId}`);
+  }
+
+  // =====================================================================
   // market_listings + app_config (Session 19)
   // =====================================================================
   section("market");

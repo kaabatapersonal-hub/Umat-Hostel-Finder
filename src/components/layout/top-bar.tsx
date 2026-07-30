@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 // Height of the bar's own content row -- excludes the safe-area inset,
 // which is added as separate top padding so the two don't fight over the
@@ -55,7 +56,7 @@ export function TopBar() {
       className="fixed inset-x-0 top-0 z-40"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="flex items-center px-4" style={{ height: TOP_BAR_HEIGHT_PX }}>
+      <div className="flex items-center justify-between px-4" style={{ height: TOP_BAR_HEIGHT_PX }}>
         <motion.span
           animate={{ opacity: condensed ? 1 : 0 }}
           transition={transition}
@@ -63,6 +64,12 @@ export function TopBar() {
         >
           Campa
         </motion.span>
+        {/* Always visible, unlike the wordmark above -- an opacity-faded
+            button would still be a live (if invisible) tap target over
+            the Home hero before the bar condenses, which is worse than
+            just picking a color that reads on both the transparent and
+            solid-green states. */}
+        <NotificationBell variant="on-dark" />
       </div>
     </motion.header>
   );

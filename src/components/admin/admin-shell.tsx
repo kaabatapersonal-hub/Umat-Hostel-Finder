@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { usePendingBuzzReportsCount } from "@/hooks/use-pending-buzz-reports-count";
 import type { AdminPermission } from "@/lib/supabase/database.types";
@@ -80,10 +81,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <span className="font-display text-h1 text-ink-900">Admin</span>
             <span className="hidden text-body-sm text-ink-500 sm:inline">Campa</span>
           </div>
-          <Link href="/" className="flex items-center gap-1.5 text-body-sm font-medium text-brand-800">
-            <ArrowLeft className="size-4" />
-            Back to app
-          </Link>
+          <div className="flex items-center gap-3">
+            <NotificationBell variant="on-light" />
+            <Link href="/" className="flex items-center gap-1.5 text-body-sm font-medium text-brand-800">
+              <ArrowLeft className="size-4" />
+              Back to app
+            </Link>
+          </div>
         </div>
 
         <nav className="mx-auto mt-3 flex max-w-5xl gap-1 overflow-x-auto">
