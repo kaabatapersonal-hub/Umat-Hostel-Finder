@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ShoppingBag, Search, Trash2, PlusCircle, Inbox, Check, X } from "lucide-react";
+import { AlertCircle, ShoppingBag, Search, Trash2, PlusCircle, Inbox, Check, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -100,6 +100,11 @@ function MarketListingModerationRow({ listing }: { listing: AdminMarketListingRo
         <Badge variant={STATUS_BADGE_VARIANT[listing.status] ?? "neutral"} size="sm">
           {listing.status === "pending_launch" ? "pending launch" : listing.status}
         </Badge>
+        <Link href={`/market/${listing.id}`} target="_blank" aria-label={`View ${listing.title}`}>
+          <Button variant="ghost" size="sm">
+            <Eye className="size-3.5" />
+          </Button>
+        </Link>
         {confirmingDelete ? (
           <>
             <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>

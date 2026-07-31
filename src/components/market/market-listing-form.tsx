@@ -63,6 +63,17 @@ function blankState(): MarketListingFormState {
   };
 }
 
+// The server-side rate limit (enforce_market_listing_rate_limit) is the
+// one failure mode where the raw Postgres message ("Rate limit: too many
+// listings in the last hour/24 hours") would otherwise leak straight into
+// the UI verbatim -- same "friendlier copy, no retry-and-fail-again"
+// posture use-create-buzz-post.ts already uses for its own rate limit.
+function listingErrorMessage(err: unknown, fallback: string): string {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("Rate limit")) return "You're listing a lot! Try again in a bit.";
+  return message || fallback;
+}
+
 function listingToFormState(listing: MarketListing): MarketListingFormState {
   return {
     title: listing.title,
@@ -152,7 +163,7 @@ export function MarketListingForm({
     if (mode.kind === "create") {
       createListing.mutate(payload, {
         onSuccess: () => setSubmitted(true),
-        onError: (err) => setFormError(err instanceof Error ? err.message : "Couldn't post your listing — try again."),
+        onError: (err) => setFormError(listingErrorMessage(err, "Couldn't post your listing — try again.")),
       });
     } else if (mode.kind === "admin-create") {
       // contact doubles as vendor_whatsapp -- keeps every existing
@@ -162,7 +173,7 @@ export function MarketListingForm({
         { ...payload, vendorName: form.vendorName.trim(), vendorWhatsapp: payload.contact, isUnclaimed: true },
         {
           onSuccess: () => setSubmitted(true),
-          onError: (err) => setFormError(err instanceof Error ? err.message : "Couldn't post this listing — try again."),
+          onError: (err) => setFormError(listingErrorMessage(err, "Couldn't post this listing — try again.")),
         }
       );
     } else {

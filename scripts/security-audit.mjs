@@ -2259,6 +2259,12 @@ async function main() {
       JSON.stringify(validService.body)
     );
     const validServiceId = validService.body?.[0]?.id;
+    // Deleted immediately, not batched at section end -- nothing later
+    // reads this id, and the new market listing rate limit (3/hour for a
+    // non-leaving-sale seller) counts currently-existing rows, so freeing
+    // this slot keeps the section's remaining stranger-owned inserts
+    // comfortably under the cap instead of stacking up against it.
+    if (validServiceId) await del(adminToken, `/market_listings?id=eq.${validServiceId}`);
 
     const badServiceType = await post(strangerToken, "/market_listings", {
       seller_id: strangerUid,
@@ -2282,6 +2288,8 @@ async function main() {
       JSON.stringify(serviceTypeOffCategory.body)
     );
     const serviceTypeOffCategoryId = serviceTypeOffCategory.body?.[0]?.id;
+    // Same immediate-delete reasoning as validServiceId above.
+    if (serviceTypeOffCategoryId) await del(adminToken, `/market_listings?id=eq.${serviceTypeOffCategoryId}`);
 
     const serviceTypeFeedCall = await rpc(null, "get_market_feed", { p_category: "services", p_service_type: "tutoring", p_limit: 20 });
     check(
@@ -2322,11 +2330,103 @@ async function main() {
       skip("hostel-linked active listings are anon-readable (hostel page section)", "no hostels exist in this database to link against");
     }
 
-    // Cleanup.
-    for (const id of [preListingId, postListingId, validServiceId, serviceTypeOffCategoryId]) {
+    // Cleanup (validServiceId/serviceTypeOffCategoryId already deleted above).
+    for (const id of [preListingId, postListingId]) {
       if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
     }
     await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: false, p_leaving_date: null });
+  }
+
+  // =====================================================================
+  // Market listing rate limiting: prevents one account from posting
+  // unlimited listings back to back, with exemptions for admins
+  // (vendor onboarding) and Leaving Campus Sale sellers (a real move-out
+  // bulk-list is expected to exceed the hourly cap).
+  // =====================================================================
+  section("market: listing rate limiting");
+  {
+    // Clean slate -- the previous section's cleanup should already have
+    // zeroed the stranger's rolling-hour count, but guard against any
+    // leftover from an interrupted prior run the same way other sections do.
+    const leftovers = await get(strangerToken, `/market_listings?seller_id=eq.${strangerUid}&select=id`);
+    for (const row of leftovers.body ?? []) await del(adminToken, `/market_listings?id=eq.${row.id}`);
+
+    const rateLimitListingIds = [];
+    let hitLimitEarly = false;
+    for (let i = 0; i < 3; i++) {
+      const created = await post(
+        strangerToken,
+        "/market_listings",
+        { seller_id: strangerUid, title: `[Market Audit] Rate limit test ${i}`, price: 10, category: "other", contact: "233200000000" },
+        "return=representation"
+      );
+      if (created.ok) rateLimitListingIds.push(created.body?.[0]?.id);
+      else hitLimitEarly = true;
+    }
+    check(
+      "3 listings within an hour are all accepted (at the limit, not over it)",
+      rateLimitListingIds.length === 3 && !hitLimitEarly,
+      `created ${rateLimitListingIds.length}/3`
+    );
+
+    const fourthListing = await post(strangerToken, "/market_listings", {
+      seller_id: strangerUid,
+      title: "[Market Audit] Rate limit test 4 -- should be rejected",
+      price: 10,
+      category: "other",
+      contact: "233200000000",
+    });
+    check("a 4th listing within the same hour is rejected (rate limit trigger)", !fourthListing.ok, `status ${fourthListing.status}`);
+
+    // moderate_market admins are exempt entirely -- admin-assisted vendor
+    // onboarding needs to create many listings back-to-back.
+    const adminListingIds = [];
+    for (let i = 0; i < 4; i++) {
+      const created = await post(
+        adminToken,
+        "/market_listings",
+        { seller_id: admin.user.id, title: `[Market Audit] Admin bypass test ${i}`, price: 10, category: "other", contact: "233200000000" },
+        "return=representation"
+      );
+      if (created.ok) adminListingIds.push(created.body?.[0]?.id);
+    }
+    check("an admin (moderate_market) is exempt from the listing rate limit", adminListingIds.length === 4, `created ${adminListingIds.length}/4`);
+
+    // Leaving Campus Sale exemption -- the stranger account is already at
+    // its hourly cap from the loop above, so a successful insert here
+    // proves the exemption genuinely bypasses the hourly check rather than
+    // just resetting the counter.
+    await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: true, p_leaving_date: null });
+    const leavingSaleListing = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Leaving sale bypass test", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    check(
+      "a student in Leaving Campus Sale mode is exempt from the hourly cap",
+      leavingSaleListing.ok,
+      JSON.stringify(leavingSaleListing.body)
+    );
+    await rpc(strangerToken, "set_leaving_campus_mode", { p_enabled: false, p_leaving_date: null });
+
+    if (hasDistinctOwner) {
+      const ownerUnaffected = await post(
+        ownerToken,
+        "/market_listings",
+        { seller_id: ownerUid, title: "[Market Audit] Owner unaffected by stranger's cap", price: 10, category: "other", contact: "233200000000" },
+        "return=representation"
+      );
+      check("the rate limit is scoped per-seller, not global", ownerUnaffected.ok, JSON.stringify(ownerUnaffected.body));
+      if (ownerUnaffected.body?.[0]?.id) await del(adminToken, `/market_listings?id=eq.${ownerUnaffected.body[0].id}`);
+    } else {
+      skip("the rate limit is scoped per-seller, not global", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    // Cleanup.
+    for (const id of [...rateLimitListingIds, ...adminListingIds, leavingSaleListing.body?.[0]?.id]) {
+      if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
+    }
   }
 
   // =====================================================================
