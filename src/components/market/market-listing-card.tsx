@@ -61,6 +61,11 @@ export function MarketListingCard({ listing, index = 0, animateIn = true }: Mark
                   Leaving Sale
                 </Badge>
               )}
+              {listing.isUnclaimed && (
+                <Badge variant="neutral" size="sm">
+                  Unclaimed
+                </Badge>
+              )}
             </div>
             {isSold && (
               <div className="absolute inset-0 flex items-center justify-center bg-ink-900/50">

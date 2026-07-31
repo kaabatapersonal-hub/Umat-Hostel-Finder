@@ -100,6 +100,7 @@ function MarketListingRow({ listing }: { listing: MarketListing }) {
           <span className="text-caption text-ink-500">{formatRelativeTime(listing.createdAt)}</span>
         </div>
         {isSold && <Badge variant="full">Sold</Badge>}
+        {listing.status === "pending_launch" && <Badge variant="filling">Pending launch</Badge>}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

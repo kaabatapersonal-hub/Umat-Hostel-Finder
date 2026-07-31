@@ -29,6 +29,13 @@ export interface MarketListing {
   // today, only the listing detail page's reverse hostel link.
   hostelId: string | null;
   viewsCount: number;
+  // Admin-assisted vendor onboarding (Marketplace pre-launch) -- set only
+  // when isUnclaimed is true; the listing is attributed to the admin's
+  // own account (sellerId) until a real student claims it, see
+  // market_listing_claims.
+  vendorName: string | null;
+  vendorWhatsapp: string | null;
+  isUnclaimed: boolean;
   createdAt: string;
 }
 
@@ -49,6 +56,7 @@ function mapFeedRow(row: {
   is_leaving_sale: boolean;
   service_type: string | null;
   views_count: number;
+  is_unclaimed: boolean;
   created_at: string;
 }): MarketListing {
   return {
@@ -66,6 +74,9 @@ function mapFeedRow(row: {
     status: "active",
     isLeavingSale: row.is_leaving_sale,
     hostelId: null,
+    vendorName: null,
+    vendorWhatsapp: null,
+    isUnclaimed: row.is_unclaimed,
     viewsCount: row.views_count,
     createdAt: row.created_at,
   };
@@ -162,7 +173,7 @@ export async function getMarketFeed(
 }
 
 const LISTING_COLUMNS =
-  "id, seller_id, title, description, price, category, condition, images, contact, is_service, service_type, status, is_leaving_sale, hostel_id, views_count, created_at";
+  "id, seller_id, title, description, price, category, condition, images, contact, is_service, service_type, status, is_leaving_sale, hostel_id, views_count, vendor_name, vendor_whatsapp, is_unclaimed, created_at";
 
 interface ListingRow {
   id: string;
@@ -180,6 +191,9 @@ interface ListingRow {
   is_leaving_sale: boolean;
   hostel_id: string | null;
   views_count: number;
+  vendor_name: string | null;
+  vendor_whatsapp: string | null;
+  is_unclaimed: boolean;
   created_at: string;
 }
 
@@ -200,6 +214,9 @@ function mapListingRow(row: ListingRow): MarketListing {
     isLeavingSale: row.is_leaving_sale,
     hostelId: row.hostel_id,
     viewsCount: row.views_count,
+    vendorName: row.vendor_name,
+    vendorWhatsapp: row.vendor_whatsapp,
+    isUnclaimed: row.is_unclaimed,
     createdAt: row.created_at,
   };
 }
@@ -337,6 +354,12 @@ export interface CreateMarketListingInput {
   images: UploadedImage[];
   contact: string;
   hostelId: string | null;
+  // Admin-assisted vendor onboarding only (Marketplace pre-launch) -- see
+  // MarketListing.vendorName/vendorWhatsapp/isUnclaimed above. Omitted for
+  // every normal self-service listing.
+  vendorName?: string | null;
+  vendorWhatsapp?: string | null;
+  isUnclaimed?: boolean;
 }
 
 export async function createMarketListing(
@@ -358,6 +381,9 @@ export async function createMarketListing(
       images: input.images as unknown as Database["public"]["Tables"]["market_listings"]["Insert"]["images"],
       contact: input.contact,
       hostel_id: input.hostelId,
+      vendor_name: input.vendorName ?? null,
+      vendor_whatsapp: input.vendorWhatsapp ?? null,
+      is_unclaimed: input.isUnclaimed ?? false,
     })
     .select(LISTING_COLUMNS)
     .single();
@@ -551,5 +577,105 @@ export async function setLeavingCampusMode(
   leavingDate: string | null
 ): Promise<void> {
   const { error } = await supabase.rpc("set_leaving_campus_mode", { p_enabled: enabled, p_leaving_date: leavingDate });
+  if (error) throw error;
+}
+
+// Public aggregate only -- backs the pre-launch home's "X products already
+// submitted" stat. Individual pending_launch rows stay RLS-hidden; see the
+// migration's own comment on why this is a dedicated RPC, not a table count.
+export async function getPendingLaunchCount(supabase: SupabaseClient<Database>): Promise<number> {
+  const { data, error } = await supabase.rpc("get_pending_launch_count");
+  if (error) throw error;
+  return data ?? 0;
+}
+
+export type MarketListingClaimStatus = "pending" | "approved" | "rejected";
+
+// Submits a claim on an admin-created, unclaimed listing. RLS's own WITH
+// CHECK (market_listing_claims_insert_own) is what actually enforces "only
+// unclaimed listings are claimable" and "one pending claim per person" --
+// this is a plain insert, no RPC needed for submission.
+export async function requestListingClaim(supabase: SupabaseClient<Database>, listingId: string, claimantId: string): Promise<void> {
+  const { error } = await supabase.from("market_listing_claims").insert({ listing_id: listingId, claimant_id: claimantId });
+  if (error) throw error;
+}
+
+// Batched lookup of the current user's own claim status across a set of
+// listing ids -- same shape as getMyLikedPostIds, so a listing detail page
+// or feed can show "Request Ownership" vs "Already requested" without one
+// query per card.
+export async function getMyListingClaims(
+  supabase: SupabaseClient<Database>,
+  listingIds: string[],
+  claimantId: string
+): Promise<Map<string, MarketListingClaimStatus>> {
+  if (listingIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("market_listing_claims")
+    .select("listing_id, status")
+    .eq("claimant_id", claimantId)
+    .in("listing_id", listingIds);
+
+  if (error) throw error;
+  return new Map((data ?? []).map((row) => [row.listing_id, row.status as MarketListingClaimStatus]));
+}
+
+export interface AdminListingClaimRow {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  claimantId: string;
+  claimantName: string | null;
+  status: MarketListingClaimStatus;
+  createdAt: string;
+}
+
+// Admin review queue -- same two-step "fetch rows, then batch-fetch the
+// related names/titles" shape as getAdminBuzzReports, rather than a
+// PostgREST embed.
+export async function getAdminListingClaims(
+  supabase: SupabaseClient<Database>,
+  { status = "pending" }: { status?: MarketListingClaimStatus } = {}
+): Promise<AdminListingClaimRow[]> {
+  const { data: claims, error } = await supabase
+    .from("market_listing_claims")
+    .select("id, listing_id, claimant_id, status, created_at")
+    .eq("status", status)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  if (!claims || claims.length === 0) return [];
+
+  const listingIds = [...new Set(claims.map((c) => c.listing_id))];
+  const claimantIds = [...new Set(claims.map((c) => c.claimant_id))];
+
+  const [listingsRes, profilesRes] = await Promise.all([
+    supabase.from("market_listings").select("id, title").in("id", listingIds),
+    supabase.from("profiles").select("id, full_name").in("id", claimantIds),
+  ]);
+  if (listingsRes.error) throw listingsRes.error;
+  if (profilesRes.error) throw profilesRes.error;
+
+  const titleById = new Map((listingsRes.data ?? []).map((l) => [l.id, l.title]));
+  const nameById = new Map((profilesRes.data ?? []).map((p) => [p.id, p.full_name as string | null]));
+
+  return claims.map((c) => ({
+    id: c.id,
+    listingId: c.listing_id,
+    listingTitle: titleById.get(c.listing_id) ?? "(deleted listing)",
+    claimantId: c.claimant_id,
+    claimantName: nameById.get(c.claimant_id) ?? null,
+    status: c.status as MarketListingClaimStatus,
+    createdAt: c.created_at,
+  }));
+}
+
+export async function resolveListingClaim(
+  supabase: SupabaseClient<Database>,
+  claimId: string,
+  action: "approve" | "reject"
+): Promise<void> {
+  const { error } = await supabase.rpc("resolve_listing_claim", { p_claim_id: claimId, p_action: action });
   if (error) throw error;
 }

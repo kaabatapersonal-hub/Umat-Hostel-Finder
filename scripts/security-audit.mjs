@@ -2330,6 +2330,270 @@ async function main() {
   }
 
   // =====================================================================
+  // Marketplace pre-launch & vendor onboarding (Marketplace Pre-Launch
+  // session): pending_launch lifecycle, bulk auto-launch, ownership claims
+  // =====================================================================
+  section("marketplace pre-launch");
+  {
+    const configBefore = await get(null, "/app_config?key=eq.marketplace_enabled&select=value");
+    const originalEnabled = configBefore.body?.[0]?.value === true;
+
+    // Same "read live value, toggle to the state this block needs, restore
+    // exactly at the end" posture the existing toggle_marketplace test
+    // above already uses -- never leave the live site's gate flipped.
+    if (originalEnabled) {
+      await rpc(adminToken, "toggle_marketplace", {});
+    }
+
+    const pendingA = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Pending launch A", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    check(
+      "a new listing auto-gets status='pending_launch' while marketplace_enabled is off",
+      pendingA.ok && pendingA.body?.[0]?.status === "pending_launch",
+      JSON.stringify(pendingA.body)
+    );
+    const pendingAId = pendingA.body?.[0]?.id;
+
+    const pendingB = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Pending launch B", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    const pendingBId = pendingB.body?.[0]?.id;
+
+    const anonReadsPending = await get(null, `/market_listings?id=eq.${pendingAId}&select=id`);
+    check("a pending_launch listing is hidden from anon", (anonReadsPending.body ?? []).length === 0, JSON.stringify(anonReadsPending.body));
+
+    if (hasDistinctOwner) {
+      const otherReadsPending = await get(ownerToken, `/market_listings?id=eq.${pendingAId}&select=id`);
+      check("a pending_launch listing is hidden from a different signed-in user", (otherReadsPending.body ?? []).length === 0, JSON.stringify(otherReadsPending.body));
+    } else {
+      skip("a pending_launch listing is hidden from a different signed-in user", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const sellerReadsOwnPending = await get(strangerToken, `/market_listings?id=eq.${pendingAId}&select=id`);
+    check("the listing's own seller CAN still see their pending_launch listing", sellerReadsOwnPending.body?.length === 1, JSON.stringify(sellerReadsOwnPending.body));
+
+    const adminReadsPending = await get(adminToken, `/market_listings?id=eq.${pendingAId}&select=id`);
+    check("admin CAN see any pending_launch listing", adminReadsPending.body?.length === 1, JSON.stringify(adminReadsPending.body));
+
+    const pendingCount = await rpc(null, "get_pending_launch_count", {});
+    check(
+      "get_pending_launch_count is anon-callable and counts at least the listings just created",
+      pendingCount.ok && typeof pendingCount.body === "number" && pendingCount.body >= 2,
+      JSON.stringify(pendingCount.body)
+    );
+
+    const sellerJumpsQueue = await patch(
+      strangerToken,
+      `/market_listings?id=eq.${pendingAId}`,
+      { status: "active" },
+      "return=representation"
+    );
+    check(
+      "a seller cannot directly flip their own pending_launch listing to active (trigger reverts it)",
+      sellerJumpsQueue.body?.[0]?.status === "pending_launch",
+      JSON.stringify(sellerJumpsQueue.body)
+    );
+
+    const adminDirectLaunch = await patch(
+      adminToken,
+      `/market_listings?id=eq.${pendingAId}`,
+      { status: "active" },
+      "return=representation"
+    );
+    check(
+      "admin CAN directly move a single listing from pending_launch to active",
+      adminDirectLaunch.body?.[0]?.status === "active",
+      JSON.stringify(adminDirectLaunch.body)
+    );
+
+    // Bulk auto-launch: flipping marketplace_enabled on should promote
+    // every remaining pending_launch listing (pendingB) to active with no
+    // seller action, and it should become publicly visible immediately.
+    const bulkLaunch = await rpc(adminToken, "toggle_marketplace", {});
+    check("toggling marketplace on returns true (now enabled)", bulkLaunch.ok && bulkLaunch.body === true, JSON.stringify(bulkLaunch.body));
+
+    const pendingBAfterLaunch = await get(adminToken, `/market_listings?id=eq.${pendingBId}&select=status`);
+    check(
+      "toggling marketplace on bulk-promotes every pending_launch listing to active",
+      pendingBAfterLaunch.body?.[0]?.status === "active",
+      JSON.stringify(pendingBAfterLaunch.body)
+    );
+
+    const pendingBAnonAfterLaunch = await get(null, `/market_listings?id=eq.${pendingBId}&select=id`);
+    check("a bulk-launched listing is immediately anon-visible", pendingBAnonAfterLaunch.body?.length === 1, JSON.stringify(pendingBAnonAfterLaunch.body));
+
+    // Restore the live flag to exactly what it was before this block ran.
+    if (!originalEnabled) {
+      await rpc(adminToken, "toggle_marketplace", {});
+    }
+
+    for (const id of [pendingAId, pendingBId]) {
+      if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
+    }
+  }
+
+  section("marketplace pre-launch: ownership claims");
+  {
+    // A normal, already-claimed (is_unclaimed=false by default) listing --
+    // used only to prove claims can't be filed against it.
+    const claimedListing = await post(
+      adminToken,
+      "/market_listings",
+      { seller_id: admin.user.id, title: "[Market Audit] Normal claimed listing", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    const claimedListingId = claimedListing.body?.[0]?.id;
+
+    // Admin-assisted vendor onboarding: attributed to the admin's own
+    // account until a real student claims it (Part 5/6 of the brief).
+    const unclaimedListing = await post(
+      adminToken,
+      "/market_listings",
+      {
+        seller_id: admin.user.id,
+        title: "[Market Audit] Unclaimed vendor listing",
+        price: 15,
+        category: "other",
+        contact: "233200000000",
+        vendor_name: "Audit Vendor",
+        vendor_whatsapp: "233200000000",
+        is_unclaimed: true,
+      },
+      "return=representation"
+    );
+    check(
+      "an admin-created listing can be marked is_unclaimed=true with vendor_name/vendor_whatsapp",
+      unclaimedListing.ok && unclaimedListing.body?.[0]?.is_unclaimed === true,
+      JSON.stringify(unclaimedListing.body)
+    );
+    const unclaimedListingId = unclaimedListing.body?.[0]?.id;
+
+    const claimOnClaimedListing = await post(strangerToken, "/market_listing_claims", {
+      listing_id: claimedListingId,
+      claimant_id: strangerUid,
+    });
+    check("cannot submit a claim on a listing that isn't unclaimed (RLS WITH CHECK)", !claimOnClaimedListing.ok, `status ${claimOnClaimedListing.status}`);
+
+    const spoofClaimant = await post(strangerToken, "/market_listing_claims", {
+      listing_id: unclaimedListingId,
+      claimant_id: admin.user.id,
+    });
+    check("cannot spoof claimant_id on a claim (RLS WITH CHECK)", !spoofClaimant.ok, `status ${spoofClaimant.status}`);
+
+    const claim1 = await post(
+      strangerToken,
+      "/market_listing_claims",
+      { listing_id: unclaimedListingId, claimant_id: strangerUid },
+      "return=representation"
+    );
+    check("a claim on an unclaimed listing is accepted, starting as pending", claim1.ok && claim1.body?.[0]?.status === "pending", JSON.stringify(claim1.body));
+    const claim1Id = claim1.body?.[0]?.id;
+
+    const duplicateClaim = await post(strangerToken, "/market_listing_claims", {
+      listing_id: unclaimedListingId,
+      claimant_id: strangerUid,
+    });
+    check("a second pending claim on the same (listing, claimant) is rejected (unique index)", !duplicateClaim.ok, `status ${duplicateClaim.status}`);
+
+    if (hasDistinctOwner) {
+      const otherReadsClaim = await get(ownerToken, `/market_listing_claims?id=eq.${claim1Id}&select=id`);
+      check("a different non-admin cannot read someone else's claim", (otherReadsClaim.body ?? []).length === 0, JSON.stringify(otherReadsClaim.body));
+    } else {
+      skip("a different non-admin cannot read someone else's claim", "owner account not confirmed -- no second distinct identity available");
+    }
+    const selfReadsClaim = await get(strangerToken, `/market_listing_claims?id=eq.${claim1Id}&select=id`);
+    check("the claimant CAN read their own claim", selfReadsClaim.body?.length === 1, JSON.stringify(selfReadsClaim.body));
+    const adminReadsClaim = await get(adminToken, `/market_listing_claims?id=eq.${claim1Id}&select=id`);
+    check("admin (moderate_market) CAN read any claim", adminReadsClaim.body?.length === 1, JSON.stringify(adminReadsClaim.body));
+
+    const nonAdminResolve = await rpc(strangerToken, "resolve_listing_claim", { p_claim_id: claim1Id, p_action: "approve" });
+    check("a non-admin cannot call resolve_listing_claim", !nonAdminResolve.ok, `status ${nonAdminResolve.status}`);
+
+    const badAction = await rpc(adminToken, "resolve_listing_claim", { p_claim_id: claim1Id, p_action: "bogus" });
+    check("resolve_listing_claim rejects an unknown action", !badAction.ok, `status ${badAction.status}`);
+
+    const rejectClaim1 = await rpc(adminToken, "resolve_listing_claim", { p_claim_id: claim1Id, p_action: "reject" });
+    const claim1AfterReject = await get(adminToken, `/market_listing_claims?id=eq.${claim1Id}&select=status`);
+    check(
+      "admin CAN reject a claim, and it doesn't transfer ownership",
+      rejectClaim1.ok && claim1AfterReject.body?.[0]?.status === "rejected",
+      JSON.stringify(claim1AfterReject.body)
+    );
+    const listingAfterReject = await get(adminToken, `/market_listings?id=eq.${unclaimedListingId}&select=seller_id,is_unclaimed`);
+    check(
+      "a rejected claim leaves the listing's ownership unchanged",
+      listingAfterReject.body?.[0]?.seller_id === admin.user.id && listingAfterReject.body?.[0]?.is_unclaimed === true,
+      JSON.stringify(listingAfterReject.body)
+    );
+
+    // Rejection frees up the (listing, claimant) pair for a fresh claim --
+    // the unique index only ever covers status='pending'.
+    const claim2 = await post(
+      strangerToken,
+      "/market_listing_claims",
+      { listing_id: unclaimedListingId, claimant_id: strangerUid },
+      "return=representation"
+    );
+    const claim2Id = claim2.body?.[0]?.id;
+
+    let claim3Id = null;
+    if (hasDistinctOwner) {
+      const claim3 = await post(
+        ownerToken,
+        "/market_listing_claims",
+        { listing_id: unclaimedListingId, claimant_id: ownerUid },
+        "return=representation"
+      );
+      claim3Id = claim3.body?.[0]?.id;
+    }
+
+    const approveClaim2 = await rpc(adminToken, "resolve_listing_claim", { p_claim_id: claim2Id, p_action: "approve" });
+    const listingAfterApprove = await get(adminToken, `/market_listings?id=eq.${unclaimedListingId}&select=seller_id,is_unclaimed`);
+    check(
+      "approving a claim transfers seller_id and clears is_unclaimed",
+      approveClaim2.ok && listingAfterApprove.body?.[0]?.seller_id === strangerUid && listingAfterApprove.body?.[0]?.is_unclaimed === false,
+      JSON.stringify(listingAfterApprove.body)
+    );
+    const claim2AfterApprove = await get(adminToken, `/market_listing_claims?id=eq.${claim2Id}&select=status`);
+    check("the approved claim's own status becomes 'approved'", claim2AfterApprove.body?.[0]?.status === "approved", JSON.stringify(claim2AfterApprove.body));
+
+    if (hasDistinctOwner && claim3Id) {
+      const claim3AfterApprove = await get(adminToken, `/market_listing_claims?id=eq.${claim3Id}&select=status`);
+      check(
+        "approving one claim auto-rejects any other still-pending claim on the same listing",
+        claim3AfterApprove.body?.[0]?.status === "rejected",
+        JSON.stringify(claim3AfterApprove.body)
+      );
+    } else {
+      skip("approving one claim auto-rejects any other still-pending claim on the same listing", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const strangerSelfReassign = await patch(
+      strangerToken,
+      `/market_listings?id=eq.${unclaimedListingId}`,
+      { seller_id: admin.user.id },
+      "return=representation"
+    );
+    check(
+      "the new owner still cannot reassign seller_id via a direct update (only resolve_listing_claim can)",
+      strangerSelfReassign.body?.[0]?.seller_id === strangerUid,
+      JSON.stringify(strangerSelfReassign.body)
+    );
+
+    // Cleanup (claim rows cascade-delete with their listing).
+    for (const id of [claimedListingId, unclaimedListingId]) {
+      if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
+    }
+  }
+
+  // =====================================================================
   // Storage: MIME allow-list, size cap, cross-user write scoping
   // =====================================================================
   section("storage");

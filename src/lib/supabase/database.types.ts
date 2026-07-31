@@ -794,6 +794,9 @@ export interface Database {
           hostel_id: string | null;
           service_type: string | null;
           views_count: number;
+          vendor_name: string | null;
+          vendor_whatsapp: string | null;
+          is_unclaimed: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -813,6 +816,9 @@ export interface Database {
           hostel_id?: string | null;
           service_type?: string | null;
           views_count?: number;
+          vendor_name?: string | null;
+          vendor_whatsapp?: string | null;
+          is_unclaimed?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -832,6 +838,9 @@ export interface Database {
           hostel_id?: string | null;
           service_type?: string | null;
           views_count?: number;
+          vendor_name?: string | null;
+          vendor_whatsapp?: string | null;
+          is_unclaimed?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -848,6 +857,51 @@ export interface Database {
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      market_listing_claims: {
+        Row: {
+          id: string;
+          listing_id: string;
+          claimant_id: string;
+          status: string;
+          reviewed_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          claimant_id: string;
+          status?: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          listing_id?: string;
+          claimant_id?: string;
+          status?: string;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "market_listing_claims_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "market_listings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "market_listing_claims_claimant_id_fkey";
+            columns: ["claimant_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -997,6 +1051,7 @@ export interface Database {
           is_leaving_sale: boolean;
           service_type: string | null;
           views_count: number;
+          is_unclaimed: boolean;
           created_at: string;
         }[];
       };
@@ -1022,6 +1077,14 @@ export interface Database {
       toggle_marketplace: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      get_pending_launch_count: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      resolve_listing_claim: {
+        Args: { p_claim_id: string; p_action: string };
+        Returns: undefined;
       };
       get_hot_buzz_posts: {
         Args: {
@@ -1118,7 +1181,8 @@ export type MarketCategory =
   | "services"
   | "other";
 export type MarketCondition = "new" | "like_new" | "good" | "fair";
-export type MarketListingStatus = "active" | "sold" | "removed";
+export type MarketListingStatus = "active" | "sold" | "removed" | "pending_launch";
+export type MarketListingClaimStatus = "pending" | "approved" | "rejected";
 export type MarketServiceType =
   | "tutoring"
   | "design"

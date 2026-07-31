@@ -24,7 +24,14 @@ import type { UploadedImage } from "@/lib/images";
 import type { MarketCategory, MarketCondition, MarketServiceType } from "@/lib/supabase/database.types";
 import type { MarketListing } from "@/lib/queries/market";
 
-export type MarketListingFormMode = { kind: "create" } | { kind: "edit"; listingId: string };
+// admin-create backs /admin/market/new -- admin-assisted onboarding for
+// vendors who won't self-onboard (Part 5 of the Marketplace Pre-Launch
+// brief). It reuses this exact form + useCreateMarketListing unchanged:
+// useCreateMarketListing always sets seller_id to whoever is actually
+// signed in, so the acting admin naturally becomes the listing's owner
+// until a real student claims it later -- no separate insert path needed,
+// just two extra vendor fields threaded through.
+export type MarketListingFormMode = { kind: "create" } | { kind: "edit"; listingId: string } | { kind: "admin-create" };
 
 interface MarketListingFormState {
   title: string;
@@ -37,6 +44,7 @@ interface MarketListingFormState {
   images: UploadedImage[];
   contact: string;
   hostelId: string | null;
+  vendorName: string;
 }
 
 function blankState(): MarketListingFormState {
@@ -51,6 +59,7 @@ function blankState(): MarketListingFormState {
     images: [],
     contact: "",
     hostelId: null,
+    vendorName: "",
   };
 }
 
@@ -66,6 +75,7 @@ function listingToFormState(listing: MarketListing): MarketListingFormState {
     images: listing.images,
     contact: listing.contact,
     hostelId: listing.hostelId,
+    vendorName: listing.vendorName ?? "",
   };
 }
 
@@ -121,12 +131,17 @@ export function MarketListingForm({
       hostelId: form.hostelId,
     });
 
+    const fieldErrors: Record<string, string> = {};
     if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
         const key = issue.path[0];
         if (typeof key === "string" && !fieldErrors[key]) fieldErrors[key] = issue.message;
       }
+    }
+    if (mode.kind === "admin-create" && !form.vendorName.trim()) {
+      fieldErrors.vendorName = "Vendor name is required";
+    }
+    if (Object.keys(fieldErrors).length > 0 || !result.success) {
       setErrors(fieldErrors);
       return;
     }
@@ -139,6 +154,17 @@ export function MarketListingForm({
         onSuccess: () => setSubmitted(true),
         onError: (err) => setFormError(err instanceof Error ? err.message : "Couldn't post your listing — try again."),
       });
+    } else if (mode.kind === "admin-create") {
+      // contact doubles as vendor_whatsapp -- keeps every existing
+      // WhatsApp-inquiry UI (buttons/links reading `contact`) working
+      // unchanged for admin-assisted listings, no separate field to wire up.
+      createListing.mutate(
+        { ...payload, vendorName: form.vendorName.trim(), vendorWhatsapp: payload.contact, isUnclaimed: true },
+        {
+          onSuccess: () => setSubmitted(true),
+          onError: (err) => setFormError(err instanceof Error ? err.message : "Couldn't post this listing — try again."),
+        }
+      );
     } else {
       updateListing.mutate(
         { listingId: mode.listingId, ...payload },
@@ -158,7 +184,11 @@ export function MarketListingForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <h2 className="font-display text-h1 text-ink-900">Listed!</h2>
-          <p className="text-body text-ink-500">Your listing is live on the marketplace.</p>
+          <p className="text-body text-ink-500">
+            {mode.kind === "admin-create"
+              ? "Saved under your account until the vendor claims it."
+              : "Your listing is live on the marketplace."}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -168,10 +198,10 @@ export function MarketListingForm({
               setSubmitted(false);
             }}
           >
-            List another
+            {mode.kind === "admin-create" ? "Add another" : "List another"}
           </Button>
-          <Button variant="accent" onClick={() => router.push("/market")}>
-            Browse Market
+          <Button variant="accent" onClick={() => router.push(mode.kind === "admin-create" ? "/admin/market" : "/market")}>
+            {mode.kind === "admin-create" ? "Back to Market Admin" : "Browse Market"}
           </Button>
         </div>
       </div>
@@ -180,7 +210,21 @@ export function MarketListingForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6 px-4 py-5">
-      <h1 className="font-display text-h1 text-ink-900">{mode.kind === "create" ? "Sell something" : "Edit listing"}</h1>
+      <h1 className="font-display text-h1 text-ink-900">
+        {mode.kind === "create" ? "Sell something" : mode.kind === "admin-create" ? "Add a vendor's product" : "Edit listing"}
+      </h1>
+
+      {mode.kind === "admin-create" && (
+        <section>
+          <Input
+            label="Vendor name"
+            placeholder="e.g. Ama's Kitchen"
+            value={form.vendorName}
+            onChange={(e) => set("vendorName", e.target.value)}
+            error={errors.vendorName}
+          />
+        </section>
+      )}
 
       <section className="flex flex-col gap-2">
         <ImageUploader
@@ -316,7 +360,7 @@ export function MarketListingForm({
 
       <section>
         <Input
-          label="WhatsApp number"
+          label={mode.kind === "admin-create" ? "Vendor's WhatsApp number" : "WhatsApp number"}
           placeholder="024 000 0000"
           value={form.contact}
           onChange={(e) => set("contact", e.target.value)}
@@ -349,7 +393,7 @@ export function MarketListingForm({
       {formError && <p className="text-body-sm text-danger">{formError}</p>}
 
       <Button type="submit" variant="accent" size="lg" loading={isPending}>
-        {mode.kind === "create" ? "Post listing" : "Save changes"}
+        {mode.kind === "edit" ? "Save changes" : "Post listing"}
       </Button>
     </form>
   );

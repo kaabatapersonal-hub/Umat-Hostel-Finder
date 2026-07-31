@@ -2,10 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { AlertCircle, MessageCircle, Share2, Check, Building2 } from "lucide-react";
+import { AlertCircle, MessageCircle, Share2, Check, Building2, Store, UserPlus } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PriceTag } from "@/components/ui/price-tag";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { MarketGallery } from "./market-gallery";
@@ -15,6 +16,9 @@ import { useMarketListing } from "@/hooks/use-market-listing";
 import { useIncrementListingViews } from "@/hooks/use-increment-listing-views";
 import { useHostelOptions } from "@/hooks/use-hostel-options";
 import { useShare } from "@/hooks/use-share";
+import { useAuth } from "@/providers/auth-provider";
+import { useMyListingClaims } from "@/hooks/use-my-listing-claim";
+import { useRequestListingClaim } from "@/hooks/use-request-listing-claim";
 import { categoryLabel, conditionLabel, serviceTypeLabel } from "@/lib/market-categories";
 import { buildWhatsAppLink, buildMarketInquiryMessage } from "@/lib/contact";
 import { formatRelativeTime, cn } from "@/lib/utils";
@@ -24,10 +28,16 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
   const incrementViews = useIncrementListingViews();
   const hasCountedView = useRef(false);
   const { share, copied } = useShare();
+  const { requireAuth } = useAuth();
   // Only fetched to resolve hostel_id -> a hostel name for the reverse
   // link below; a small, cached, app-wide list (see the hook), not a
   // per-listing fetch.
   const { data: hostelOptions } = useHostelOptions();
+  // Only worth asking for once we know this listing is actually claimable
+  // -- claimed listings never need this lookup at all.
+  const { data: myClaims } = useMyListingClaims(listing?.isUnclaimed ? [listingId] : []);
+  const requestClaim = useRequestListingClaim();
+  const myClaimStatus = myClaims?.get(listingId);
 
   useEffect(() => {
     if (hasCountedView.current) return;
@@ -112,6 +122,16 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
                 Sold
               </Badge>
             )}
+            {listing.status === "pending_launch" && (
+              <Badge variant="filling" size="sm">
+                Pending launch
+              </Badge>
+            )}
+            {listing.isUnclaimed && (
+              <Badge variant="neutral" size="sm">
+                Unclaimed
+              </Badge>
+            )}
           </div>
           <span className="text-caption text-ink-300">Listed {formatRelativeTime(listing.createdAt)}</span>
         </div>
@@ -139,6 +159,28 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
           </button>
         </div>
 
+        {listing.isUnclaimed && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="self-start"
+            disabled={myClaimStatus === "pending" || myClaimStatus === "approved"}
+            loading={requestClaim.isPending}
+            onClick={() =>
+              requireAuth(() => requestClaim.mutate(listingId), {
+                message: "Join Campa to request ownership of this listing.",
+              })
+            }
+          >
+            <UserPlus className="size-4" />
+            {myClaimStatus === "pending"
+              ? "Ownership requested"
+              : myClaimStatus === "approved"
+                ? "Claimed"
+                : "This is my listing — request ownership"}
+          </Button>
+        )}
+
         {listing.description && (
           <div className="flex flex-col gap-1.5">
             <h2 className="text-body-strong text-ink-900">Description</h2>
@@ -146,7 +188,19 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
           </div>
         )}
 
-        <SellerInfoCard sellerId={listing.sellerId} />
+        {listing.isUnclaimed ? (
+          <div className="flex items-center gap-3 rounded-lg bg-surface p-3 shadow-card">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-800">
+              <Store className="size-5" strokeWidth={1.75} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="line-clamp-1 text-body-strong text-ink-900">{listing.vendorName || "Vendor"}</span>
+              <span className="text-caption text-ink-500">Not yet on Campa — listed by an admin</span>
+            </div>
+          </div>
+        ) : (
+          <SellerInfoCard sellerId={listing.sellerId} />
+        )}
 
         {hostelName && (
           <Link
