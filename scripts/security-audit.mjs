@@ -1001,6 +1001,41 @@ async function main() {
     );
     const adminPostId = adminPost.body?.[0]?.id;
 
+    // A sub-admin does NOT get the Official badge just from being an
+    // admin -- only super admins, or a sub-admin explicitly granted
+    // post_as_official, should. (This was a real product bug: every
+    // sub-admin's Buzz posts were auto-badged Official regardless of
+    // what they were actually promoted for.)
+    await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "admin", p_permissions: ["moderate_buzz"] });
+    const subAdminNoOfficialPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Sub-admin without post_as_official" },
+      "return=representation"
+    );
+    check(
+      "a sub-admin WITHOUT post_as_official is not auto-badged Official",
+      subAdminNoOfficialPost.ok && subAdminNoOfficialPost.body?.[0]?.is_admin_post === false,
+      JSON.stringify(subAdminNoOfficialPost.body)
+    );
+    if (subAdminNoOfficialPost.body?.[0]?.id) await del(adminToken, `/buzz_posts?id=eq.${subAdminNoOfficialPost.body[0].id}`);
+
+    await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "admin", p_permissions: ["post_as_official"] });
+    const subAdminOfficialPost = await post(
+      strangerToken,
+      "/buzz_posts",
+      { author_id: strangerUid, content: "[Buzz Audit] Sub-admin WITH post_as_official" },
+      "return=representation"
+    );
+    check(
+      "a sub-admin WITH post_as_official IS auto-badged Official",
+      subAdminOfficialPost.ok && subAdminOfficialPost.body?.[0]?.is_admin_post === true,
+      JSON.stringify(subAdminOfficialPost.body)
+    );
+    if (subAdminOfficialPost.body?.[0]?.id) await del(adminToken, `/buzz_posts?id=eq.${subAdminOfficialPost.body[0].id}`);
+
+    await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "student" });
+
     // Replies + reply_count trigger.
     const replyInsert = await post(
       strangerToken,

@@ -9,10 +9,10 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAuth } from "@/providers/auth-provider";
 import { useUpdateProfile } from "@/hooks/use-update-profile";
 import { normalizePhoneNumber } from "@/lib/contact";
+import { usernameError, USERNAME_MAX_LENGTH } from "@/lib/username";
 import { cn } from "@/lib/utils";
 
 const BIO_MAX_LENGTH = 150;
-const USERNAME_MAX_LENGTH = 30;
 
 // A stored international number (233XXXXXXXXX) is shown back to the user
 // in the same local "0XX..." shape they'd naturally type it in, not the
@@ -34,6 +34,7 @@ export default function EditProfilePage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [phone, setPhone] = useState("");
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [usernameErrorMsg, setUsernameErrorMsg] = useState<string | undefined>(undefined);
 
   // Prefills once, the first time the real profile arrives -- not on
   // every profile change, or the user's own in-progress edits would get
@@ -55,9 +56,18 @@ export default function EditProfilePage() {
 
   function handleSave() {
     if (!user) return;
+
+    const trimmedUsername = username.trim();
+    const err = usernameError(trimmedUsername);
+    if (err) {
+      setUsernameErrorMsg(err);
+      return;
+    }
+    setUsernameErrorMsg(undefined);
+
     updateProfile.mutate(
       {
-        username: username.trim() || null,
+        username: trimmedUsername || null,
         bio: bio.trim() || null,
         whatsappNumber: whatsapp.trim() ? normalizePhoneNumber(whatsapp.trim()) : null,
         phoneNumber: phone.trim() ? normalizePhoneNumber(phone.trim()) : null,
@@ -78,9 +88,13 @@ export default function EditProfilePage() {
         <Input
           label="Username"
           value={username}
-          onChange={(e) => setUsername(e.target.value.slice(0, USERNAME_MAX_LENGTH))}
+          onChange={(e) => {
+            setUsername(e.target.value.slice(0, USERNAME_MAX_LENGTH));
+            if (usernameErrorMsg) setUsernameErrorMsg(undefined);
+          }}
           placeholder="Choose a username"
-          helperText='This is how other students will see you. Leave blank to stay as "Student".'
+          error={usernameErrorMsg}
+          helperText='Letters, numbers, spaces, and underscores only. Leave blank to stay as "Student".'
         />
 
         <div className="flex flex-col gap-1.5">

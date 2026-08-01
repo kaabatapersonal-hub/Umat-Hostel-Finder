@@ -1342,7 +1342,8 @@ export type AdminPermission =
   | "moderate_buzz"
   | "moderate_reviews"
   | "moderate_market"
-  | "send_broadcasts";
+  | "send_broadcasts"
+  | "post_as_official";
 export type SubmissionStatus = "pending" | "approved" | "rejected";
 export type NotificationType =
   | "buzz_reply"

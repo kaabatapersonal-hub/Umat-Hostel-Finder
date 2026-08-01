@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { captureEvent } from "@/lib/analytics";
 import { useToast } from "@/components/ui/toast";
+import { USERNAME_MAX_LENGTH, USERNAME_PATTERN } from "@/lib/username";
 
 const emailSchema = z.email("Enter a valid email");
 // Deliberately no minimum length here -- this one field now serves both
@@ -31,8 +32,8 @@ const usernameSchema = z
   .string()
   .trim()
   .min(1, "Choose a username")
-  .max(30, "Keep it under 30 characters")
-  .regex(/^[a-zA-Z0-9_ ]+$/, "Letters, numbers, spaces, and underscores only");
+  .max(USERNAME_MAX_LENGTH, "Keep it under 30 characters")
+  .regex(USERNAME_PATTERN, "Letters, numbers, spaces, and underscores only");
 
 const DEFAULT_SUBTITLE = "Save hostels, post on Buzz, and sell on the Marketplace";
 
