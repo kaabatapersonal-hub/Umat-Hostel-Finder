@@ -23,6 +23,7 @@ import { useMyListingClaims } from "@/hooks/use-my-listing-claim";
 import { useRequestListingClaim } from "@/hooks/use-request-listing-claim";
 import { categoryLabel, conditionLabel, serviceTypeLabel } from "@/lib/market-categories";
 import { buildWhatsAppLink, buildMarketInquiryMessage } from "@/lib/contact";
+import { joinCampaPitch } from "@/lib/share-message";
 import { formatRelativeTime, cn } from "@/lib/utils";
 
 export function MarketListingDetailView({ listingId }: { listingId: string }) {
@@ -53,7 +54,7 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
 
   function handleShare() {
     if (!listing) return;
-    share(listing.title, `${window.location.origin}/market/${listing.id}`);
+    share(listing.title, `${window.location.origin}/market/${listing.id}`, `Check out "${listing.title}" on Campa!${joinCampaPitch()}`);
   }
 
   if (isPending) {
@@ -109,6 +110,7 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
             amount={listing.price}
             period={null}
             pricePrefix={listing.isService ? "From" : null}
+            priceVaries={listing.priceVaries}
             className="self-start text-body-strong"
           />
           <div className="flex flex-wrap items-center gap-1.5">

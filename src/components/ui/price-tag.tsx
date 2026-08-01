@@ -18,6 +18,10 @@ export interface PriceTagProps extends React.HTMLAttributes<HTMLSpanElement> {
   // obscure) global HTML/React attribute already present on
   // HTMLAttributes<HTMLSpanElement>.
   pricePrefix?: string | null;
+  // A flyer-style listing with several items/prices in one photo -- no
+  // single real number to show. Takes priority over amount/isFree/range
+  // entirely (a listing is never simultaneously Free and "varies").
+  priceVaries?: boolean;
 }
 
 export function PriceTag({
@@ -27,10 +31,11 @@ export function PriceTag({
   period = "year",
   currency = "GHS",
   pricePrefix,
+  priceVaries = false,
   ...props
 }: PriceTagProps) {
   const isRange = max !== undefined && max !== amount;
-  const isFree = amount === 0 && !isRange;
+  const isFree = amount === 0 && !isRange && !priceVaries;
 
   return (
     <span
@@ -41,11 +46,17 @@ export function PriceTag({
       {...props}
     >
       <span className="font-display text-body-strong font-semibold">
-        {pricePrefix && !isFree && `${pricePrefix} `}
-        {isFree ? "Free" : `${currency} ${amount.toLocaleString()}`}
-        {isRange && ` – ${max.toLocaleString()}`}
+        {priceVaries ? (
+          "Price varies"
+        ) : (
+          <>
+            {pricePrefix && !isFree && `${pricePrefix} `}
+            {isFree ? "Free" : `${currency} ${amount.toLocaleString()}`}
+            {isRange && ` – ${max.toLocaleString()}`}
+          </>
+        )}
       </span>
-      {period && <span className="text-caption opacity-80">/ {period}</span>}
+      {period && !priceVaries && <span className="text-caption opacity-80">/ {period}</span>}
     </span>
   );
 }

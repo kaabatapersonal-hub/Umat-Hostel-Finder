@@ -2,6 +2,7 @@
 
 import { Forward } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { joinCampaPitch } from "@/lib/share-message";
 
 export interface ShareButtonProps {
   postId: string;
@@ -35,12 +36,13 @@ export function ShareButton({ postId, content }: ShareButtonProps) {
     e.stopPropagation();
 
     const url = buildShareUrl(postId);
+    const text = `${truncate(content, SHARE_TEXT_MAX_LENGTH)}${joinCampaPitch()}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Check out this post on Campa Buzz",
-          text: truncate(content, SHARE_TEXT_MAX_LENGTH),
+          text,
           url,
         });
       } catch (err) {
@@ -54,7 +56,9 @@ export function ShareButton({ postId, content }: ShareButtonProps) {
     }
 
     try {
-      await navigator.clipboard.writeText(url);
+      // Clipboard has no separate text/url fields -- fold the pitch in
+      // ahead of the link so pasting elsewhere still carries the message.
+      await navigator.clipboard.writeText(`${text}\n${url}`);
       showToast({ message: "Link copied!", variant: "success" });
     } catch {
       showToast({ message: "Couldn't copy the link — try again?", variant: "error" });

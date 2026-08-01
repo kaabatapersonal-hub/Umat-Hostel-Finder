@@ -2345,6 +2345,55 @@ async function main() {
   }
 
   // =====================================================================
+  // Market listing "price varies" (flyer-style listings with no single
+  // real price -- see 20260806000000_signup_username_price_varies.sql).
+  // =====================================================================
+  section("market: price varies");
+  {
+    const varies = await post(
+      strangerToken,
+      "/market_listings",
+      { seller_id: strangerUid, title: "[Market Audit] Price varies listing", price: 0, price_varies: true, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    check(
+      "a listing can be created with price_varies=true",
+      varies.ok && varies.body?.[0]?.price_varies === true && varies.body?.[0]?.price === 0,
+      JSON.stringify(varies.body)
+    );
+    const variesId = varies.body?.[0]?.id;
+
+    // Same admin-direct-activation path already proven safe in the
+    // marketplace pre-launch tests -- avoids touching the global
+    // marketplace_enabled flag just to exercise get_market_feed's filters.
+    const activated = await patch(adminToken, `/market_listings?id=eq.${variesId}`, { status: "active" }, "return=representation");
+    check("admin can activate the price-varies listing directly for this test", activated.ok && activated.body?.[0]?.status === "active", JSON.stringify(activated.body));
+
+    const feedDefault = await rpc(null, "get_market_feed", { p_search: "[Market Audit] Price varies listing", p_limit: 5 });
+    check(
+      "get_market_feed returns a price-varies listing with the flag set, with no filters applied",
+      feedDefault.ok && (feedDefault.body ?? []).some((row) => row.id === variesId && row.price_varies === true),
+      JSON.stringify(feedDefault.body)?.slice(0, 300)
+    );
+
+    const freeOnlyFeed = await rpc(null, "get_market_feed", { p_free_only: true, p_limit: 50 });
+    check(
+      "get_market_feed p_free_only=true excludes price-varies listings (they aren't actually free)",
+      freeOnlyFeed.ok && !(freeOnlyFeed.body ?? []).some((row) => row.id === variesId),
+      JSON.stringify(freeOnlyFeed.body)?.slice(0, 200)
+    );
+
+    const priceRangeFeed = await rpc(null, "get_market_feed", { p_price_min: 0, p_price_max: 1000, p_limit: 50 });
+    check(
+      "get_market_feed with a price range excludes price-varies listings (no real number to compare)",
+      priceRangeFeed.ok && !(priceRangeFeed.body ?? []).some((row) => row.id === variesId),
+      JSON.stringify(priceRangeFeed.body)?.slice(0, 200)
+    );
+
+    if (variesId) await del(adminToken, `/market_listings?id=eq.${variesId}`);
+  }
+
+  // =====================================================================
   // Market listing rate limiting: prevents one account from posting
   // unlimited listings back to back, with exemptions for admins
   // (vendor onboarding) and Leaving Campus Sale sellers (a real move-out

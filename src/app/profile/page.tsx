@@ -26,6 +26,7 @@ import { useProfileStats } from "@/hooks/use-profile-stats";
 import { LeavingCampusToggle } from "@/components/market/leaving-campus-toggle";
 import { SavedMarketListingRow } from "@/components/market/saved-market-listing-row";
 import { BadgeRow } from "@/components/profile/badge-row";
+import { UsernameNudgeBanner } from "@/components/profile/username-nudge-banner";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
 import type { MarketListing } from "@/lib/queries/market";
@@ -198,6 +199,8 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-6">
+      <UsernameNudgeBanner />
+
       <div className="flex items-center gap-3">
         <UserAvatar username={profile?.username ?? null} avatarColor={profile?.avatarColor ?? null} size="lg" />
         <div className="flex min-w-0 flex-1 flex-col">

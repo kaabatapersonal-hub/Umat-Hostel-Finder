@@ -38,6 +38,10 @@ interface MarketListingFormState {
   description: string;
   price: string;
   isFree: boolean;
+  // A flyer-style listing (several items/prices in one photo) with no
+  // single real price -- mutually exclusive with isFree, see the toggle
+  // pair in the JSX below.
+  priceVaries: boolean;
   category: MarketCategory | null;
   condition: MarketCondition | null;
   serviceType: MarketServiceType | null;
@@ -53,6 +57,7 @@ function blankState(): MarketListingFormState {
     description: "",
     price: "",
     isFree: false,
+    priceVaries: false,
     category: null,
     condition: null,
     serviceType: null,
@@ -79,7 +84,8 @@ function listingToFormState(listing: MarketListing): MarketListingFormState {
     title: listing.title,
     description: listing.description ?? "",
     price: listing.price === 0 ? "" : String(listing.price),
-    isFree: listing.price === 0,
+    isFree: listing.price === 0 && !listing.priceVaries,
+    priceVaries: listing.priceVaries,
     category: listing.category,
     condition: listing.condition,
     serviceType: listing.serviceType,
@@ -133,7 +139,7 @@ export function MarketListingForm({
     const result = submitMarketListingSchema.safeParse({
       title: form.title,
       description: form.description.trim() || null,
-      price: form.isFree ? 0 : form.price,
+      price: form.isFree || form.priceVaries ? 0 : form.price,
       category: form.category,
       condition: isServiceCategory ? null : form.condition,
       serviceType: isServiceCategory ? form.serviceType : null,
@@ -161,16 +167,19 @@ export function MarketListingForm({
     const payload = result.data;
 
     if (mode.kind === "create") {
-      createListing.mutate(payload, {
-        onSuccess: () => setSubmitted(true),
-        onError: (err) => setFormError(listingErrorMessage(err, "Couldn't post your listing — try again.")),
-      });
+      createListing.mutate(
+        { ...payload, priceVaries: form.priceVaries },
+        {
+          onSuccess: () => setSubmitted(true),
+          onError: (err) => setFormError(listingErrorMessage(err, "Couldn't post your listing — try again.")),
+        }
+      );
     } else if (mode.kind === "admin-create") {
       // contact doubles as vendor_whatsapp -- keeps every existing
       // WhatsApp-inquiry UI (buttons/links reading `contact`) working
       // unchanged for admin-assisted listings, no separate field to wire up.
       createListing.mutate(
-        { ...payload, vendorName: form.vendorName.trim(), vendorWhatsapp: payload.contact, isUnclaimed: true },
+        { ...payload, vendorName: form.vendorName.trim(), vendorWhatsapp: payload.contact, isUnclaimed: true, priceVaries: form.priceVaries },
         {
           onSuccess: () => setSubmitted(true),
           onError: (err) => setFormError(listingErrorMessage(err, "Couldn't post this listing — try again.")),
@@ -178,7 +187,7 @@ export function MarketListingForm({
       );
     } else {
       updateListing.mutate(
-        { listingId: mode.listingId, ...payload },
+        { listingId: mode.listingId, ...payload, priceVaries: form.priceVaries },
         {
           onSuccess: () => router.push(`/market/${mode.listingId}`),
           onError: (err) => setFormError(err instanceof Error ? err.message : "Couldn't save your changes — try again."),
@@ -262,18 +271,30 @@ export function MarketListingForm({
             <span className="text-label label text-ink-500">
               {form.category === "services" ? "Rate (GHS)" : "Price (GHS)"}
             </span>
-            <button
-              type="button"
-              onClick={() => set("isFree", !form.isFree)}
-              className={cn(
-                "rounded-pill px-3 py-1 text-caption font-medium",
-                form.isFree ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
-              )}
-            >
-              Free
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, isFree: !prev.isFree, priceVaries: false }))}
+                className={cn(
+                  "rounded-pill px-3 py-1 text-caption font-medium",
+                  form.isFree ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
+                )}
+              >
+                Free
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, priceVaries: !prev.priceVaries, isFree: false }))}
+                className={cn(
+                  "rounded-pill px-3 py-1 text-caption font-medium",
+                  form.priceVaries ? "bg-brand-800 text-white" : "bg-surface-muted text-ink-500"
+                )}
+              >
+                Price varies
+              </button>
+            </div>
           </div>
-          {!form.isFree && (
+          {!form.isFree && !form.priceVaries && (
             <Input
               type="number"
               min={0}
@@ -283,6 +304,11 @@ export function MarketListingForm({
               onChange={(e) => set("price", e.target.value)}
               error={errors.price}
             />
+          )}
+          {form.priceVaries && (
+            <p className="text-body-sm text-ink-500">
+              Use this for a flyer with several items or prices — buyers will see &quot;Price varies&quot; and ask you directly.
+            </p>
           )}
         </div>
       </section>

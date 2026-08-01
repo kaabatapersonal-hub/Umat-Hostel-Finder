@@ -9,6 +9,7 @@ import { useSellerInfo } from "@/hooks/use-seller-info";
 import { useSellerListings } from "@/hooks/use-seller-listings";
 import { useShare } from "@/hooks/use-share";
 import { buildWhatsAppLink } from "@/lib/contact";
+import { joinCampaPitch } from "@/lib/share-message";
 import { getInitials, cn } from "@/lib/utils";
 
 // Public, no sign-in required -- both underlying reads (get_seller_public_
@@ -56,10 +57,8 @@ export function SellerSaleView({ sellerId }: { sellerId: string }) {
     : null;
 
   function handleShare() {
-    share(
-      profile.isLeavingSale ? `${name}'s Leaving Sale` : `${name}'s Listings`,
-      typeof window !== "undefined" ? window.location.href : ""
-    );
+    const title = profile.isLeavingSale ? `${name}'s Leaving Sale` : `${name}'s Listings`;
+    share(title, typeof window !== "undefined" ? window.location.href : "", `Check out ${title} on Campa!${joinCampaPitch()}`);
   }
 
   return (

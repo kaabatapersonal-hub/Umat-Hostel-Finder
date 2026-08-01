@@ -22,6 +22,18 @@ const emailSchema = z.email("Enter a valid email");
 // other signUp error.
 const passwordSchema = z.string().min(1, "Enter your password");
 
+// Same rule as the CHECK constraint on profiles.username -- validated here
+// too so a new signup gets a friendly inline error instead of a raw
+// Postgres error surfacing through friendlyErrorMessage(). Only ever
+// checked on the signUp path (see handleContinue) -- an existing user
+// signing in never has this enforced against them.
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(1, "Choose a username")
+  .max(30, "Keep it under 30 characters")
+  .regex(/^[a-zA-Z0-9_ ]+$/, "Letters, numbers, spaces, and underscores only");
+
 const DEFAULT_SUBTITLE = "Save hostels, post on Buzz, and sell on the Marketplace";
 
 export interface AuthSheetProps {
@@ -65,7 +77,8 @@ function friendlyErrorMessage(error: { message?: string } | null | undefined): s
 export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [username, setUsername] = useState("");
+  const [errors, setErrors] = useState<{ email?: string; password?: string; username?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [wrongPassword, setWrongPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -85,6 +98,7 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
   function handleClose() {
     setEmail("");
     setPassword("");
+    setUsername("");
     resetTransientState();
     onClose();
   }
@@ -142,8 +156,20 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
       // Sign-in failed -- could mean "no account with this email yet"
       // (fine, create one) or "wrong password on an existing account"
       // (not fine). signUp's own response tells them apart -- see
-      // looksLikeExistingAccount.
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+      // looksLikeExistingAccount. Username is only validated once we're
+      // actually about to attempt a real signup -- an existing user whose
+      // password just doesn't match yet never gets blocked on this field.
+      const usernameResult = usernameSchema.safeParse(username);
+      if (!usernameResult.success) {
+        setErrors((prev) => ({ ...prev, username: usernameResult.error.issues[0]?.message }));
+        return;
+      }
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { username: usernameResult.data } },
+      });
 
       if (looksLikeExistingAccount(signUpError, signUpData?.user)) {
         setWrongPassword(true);
@@ -214,6 +240,16 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             error={errors.password}
+          />
+
+          <Input
+            label="Username"
+            autoComplete="username"
+            placeholder="Choose a username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            error={errors.username}
+            helperText="Only needed if you're creating a new account"
           />
 
           {formError && (

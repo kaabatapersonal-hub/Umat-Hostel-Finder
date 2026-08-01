@@ -65,6 +65,7 @@ export function MarketListingCard({ listing, index = 0, animateIn = true }: Mark
                 amount={listing.price}
                 period={null}
                 pricePrefix={listing.isService ? "From" : null}
+                priceVaries={listing.priceVaries}
                 className="text-caption"
               />
               {listing.isLeavingSale && (

@@ -52,3 +52,30 @@ export function dismissBrowsingNudge(): void {
     // Ignore.
   }
 }
+
+// Unlike the browsing nudge above, "you don't have a username yet" is a
+// real, persistent account fact, not a one-off session heuristic -- the
+// dismiss is still session-scoped (don't nag on every single page load),
+// but deliberately reappears next session for as long as profile.username
+// actually stays null, rather than being permanently silenced by one
+// dismiss the way an install prompt would be.
+const USERNAME_NUDGE_DISMISSED_KEY = "campa-nudge-username-dismissed";
+
+export function shouldShowUsernameNudge(hasUsername: boolean): boolean {
+  if (typeof window === "undefined") return false;
+  if (hasUsername) return false;
+  try {
+    return sessionStorage.getItem(USERNAME_NUDGE_DISMISSED_KEY) !== "1";
+  } catch {
+    return false;
+  }
+}
+
+export function dismissUsernameNudge(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(USERNAME_NUDGE_DISMISSED_KEY, "1");
+  } catch {
+    // Ignore.
+  }
+}

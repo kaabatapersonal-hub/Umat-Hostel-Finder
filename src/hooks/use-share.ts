@@ -8,17 +8,21 @@ import { useState } from "react";
 export function useShare() {
   const [copied, setCopied] = useState(false);
 
-  async function share(title: string, url: string) {
+  async function share(title: string, url: string, text?: string) {
     if (navigator.share) {
       try {
-        await navigator.share({ title, url });
+        await navigator.share({ title, url, text });
       } catch {
         // User dismissed the share sheet -- not an error worth surfacing.
       }
       return;
     }
     try {
-      await navigator.clipboard.writeText(url);
+      // Clipboard has no separate title/text/url fields the way the Web
+      // Share API does -- fold text in ahead of the url (if given) so
+      // pasting into WhatsApp/anywhere else still carries the full
+      // message, not just a bare link.
+      await navigator.clipboard.writeText(text ? `${text}\n${url}` : url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {

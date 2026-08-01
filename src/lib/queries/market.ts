@@ -36,6 +36,10 @@ export interface MarketListing {
   vendorName: string | null;
   vendorWhatsapp: string | null;
   isUnclaimed: boolean;
+  // A flyer-style listing (several items/prices in one photo) with no
+  // single real price -- price itself stays 0 (same placeholder Free
+  // already uses), this is what actually distinguishes the two states.
+  priceVaries: boolean;
   createdAt: string;
 }
 
@@ -57,6 +61,7 @@ function mapFeedRow(row: {
   service_type: string | null;
   views_count: number;
   is_unclaimed: boolean;
+  price_varies: boolean;
   created_at: string;
 }): MarketListing {
   return {
@@ -77,6 +82,7 @@ function mapFeedRow(row: {
     vendorName: null,
     vendorWhatsapp: null,
     isUnclaimed: row.is_unclaimed,
+    priceVaries: row.price_varies,
     viewsCount: row.views_count,
     createdAt: row.created_at,
   };
@@ -173,7 +179,7 @@ export async function getMarketFeed(
 }
 
 const LISTING_COLUMNS =
-  "id, seller_id, title, description, price, category, condition, images, contact, is_service, service_type, status, is_leaving_sale, hostel_id, views_count, vendor_name, vendor_whatsapp, is_unclaimed, created_at";
+  "id, seller_id, title, description, price, category, condition, images, contact, is_service, service_type, status, is_leaving_sale, hostel_id, views_count, vendor_name, vendor_whatsapp, is_unclaimed, price_varies, created_at";
 
 interface ListingRow {
   id: string;
@@ -194,6 +200,7 @@ interface ListingRow {
   vendor_name: string | null;
   vendor_whatsapp: string | null;
   is_unclaimed: boolean;
+  price_varies: boolean;
   created_at: string;
 }
 
@@ -217,6 +224,7 @@ function mapListingRow(row: ListingRow): MarketListing {
     vendorName: row.vendor_name,
     vendorWhatsapp: row.vendor_whatsapp,
     isUnclaimed: row.is_unclaimed,
+    priceVaries: row.price_varies,
     createdAt: row.created_at,
   };
 }
@@ -262,7 +270,11 @@ export async function getRelatedMarketListings(
     return {
       listing,
       sameCategory: listing.category === category ? 0 : 1,
-      priceGap: Math.abs(listing.price - price),
+      // A "price varies" listing has no real number to compare -- treat
+      // it as maximally far so it sorts after every listing with an
+      // actual price gap, rather than clustering with genuinely
+      // similarly-priced (or, worse, coincidentally free) items.
+      priceGap: listing.priceVaries ? Number.POSITIVE_INFINITY : Math.abs(listing.price - price),
       createdAtMs: new Date(listing.createdAt).getTime(),
     };
   });
@@ -360,6 +372,8 @@ export interface CreateMarketListingInput {
   vendorName?: string | null;
   vendorWhatsapp?: string | null;
   isUnclaimed?: boolean;
+  // Flyer-style listing with no single price -- see MarketListing.priceVaries.
+  priceVaries?: boolean;
 }
 
 export async function createMarketListing(
@@ -384,6 +398,7 @@ export async function createMarketListing(
       vendor_name: input.vendorName ?? null,
       vendor_whatsapp: input.vendorWhatsapp ?? null,
       is_unclaimed: input.isUnclaimed ?? false,
+      price_varies: input.priceVaries ?? false,
     })
     .select(LISTING_COLUMNS)
     .single();
@@ -403,6 +418,7 @@ export interface UpdateMarketListingInput {
   images: UploadedImage[];
   contact: string;
   hostelId: string | null;
+  priceVaries?: boolean;
 }
 
 export async function updateMarketListing(
@@ -421,6 +437,7 @@ export async function updateMarketListing(
       images: input.images as unknown as Database["public"]["Tables"]["market_listings"]["Update"]["images"],
       contact: input.contact,
       hostel_id: input.hostelId,
+      price_varies: input.priceVaries ?? false,
     })
     .eq("id", input.listingId)
     .select(LISTING_COLUMNS)

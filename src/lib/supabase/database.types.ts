@@ -938,6 +938,7 @@ export interface Database {
           vendor_name: string | null;
           vendor_whatsapp: string | null;
           is_unclaimed: boolean;
+          price_varies: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -960,6 +961,7 @@ export interface Database {
           vendor_name?: string | null;
           vendor_whatsapp?: string | null;
           is_unclaimed?: boolean;
+          price_varies?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -982,6 +984,7 @@ export interface Database {
           vendor_name?: string | null;
           vendor_whatsapp?: string | null;
           is_unclaimed?: boolean;
+          price_varies?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1196,6 +1199,7 @@ export interface Database {
           service_type: string | null;
           views_count: number;
           is_unclaimed: boolean;
+          price_varies: boolean;
           created_at: string;
         }[];
       };
