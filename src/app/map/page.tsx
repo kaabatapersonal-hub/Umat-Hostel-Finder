@@ -1,14 +1,16 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Map as MapIcon, List, X } from "lucide-react";
+import { Map as MapIcon, List, X, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { TOP_BAR_HEIGHT_PX } from "@/components/layout/top-bar";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/components/layout/bottom-nav";
 import { FilterChips } from "@/components/hostels/filter-chips";
+import { HostelFiltersSheet } from "@/components/hostels/hostel-filters-sheet";
+import { cn } from "@/lib/utils";
 import { useMapHostels } from "@/hooks/use-map-hostels";
 import { useHostelFilters } from "@/hooks/use-hostel-filters";
 import { useUserLocation } from "@/hooks/use-user-location";
@@ -63,6 +65,7 @@ function MapPinBanner({ children }: { children: React.ReactNode }) {
 function MapPageContent() {
   const { data: hostels, isPending, isError, refetch } = useMapHostels();
   const { filters, setFilters, queryString } = useHostelFilters();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const userLocation = useUserLocation();
   const searchParams = useSearchParams();
   const focusHostelId = searchParams.get("hostelId");
@@ -82,17 +85,34 @@ function MapPageContent() {
         title="Map"
         subtitle={isPending ? "Loading hostels near UMaT…" : `${count} hostel${count === 1 ? "" : "s"} near UMaT`}
         action={
-          <Link
-            href={listHref}
-            className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 text-body-sm font-medium text-brand-800 shadow-card"
-          >
-            <List className="size-4" />
-            List
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Filters"
+              onClick={() => setFiltersOpen(true)}
+              className={cn(
+                "flex size-9 shrink-0 items-center justify-center rounded-md shadow-card transition-colors",
+                filters.priceMin != null || filters.priceMax != null || !!filters.roomType
+                  ? "bg-gold-500 text-ink-900"
+                  : "border border-line bg-surface text-ink-500"
+              )}
+            >
+              <SlidersHorizontal className="size-4" />
+            </button>
+            <Link
+              href={listHref}
+              className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 text-body-sm font-medium text-brand-800 shadow-card"
+            >
+              <List className="size-4" />
+              List
+            </Link>
+          </div>
         }
       />
 
       <FilterChips value={filters} onChange={setFilters} />
+
+      <HostelFiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} onApply={setFilters} />
 
       {(userLocation.status === "denied" || userLocation.status === "unavailable") && userLocation.message && (
         <div className="mx-4 mb-3 flex items-center justify-between gap-3 rounded-md bg-surface-muted px-3.5 py-2.5 text-body-sm text-ink-500">

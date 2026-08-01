@@ -17,6 +17,10 @@ export function useSellerInfo(sellerId: string) {
       ]);
       return { profile, activeListingCount };
     },
+    // Guards callers that must call this before their own data has loaded
+    // yet (hooks can't be conditional) -- e.g. MarketListingDetailView
+    // needs the seller's rating before it knows the listing's sellerId.
+    enabled: !!sellerId,
     staleTime: 60_000,
   });
 }

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { categoryIcon, conditionLabel, serviceTypeLabel } from "@/lib/market-categories";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { thumbnailSrc } from "@/lib/images";
+import { SaveListingHeartButton } from "./save-listing-heart-button";
 import type { MarketListing } from "@/lib/queries/market";
 
 export interface MarketListingCardProps {
@@ -49,6 +50,16 @@ export function MarketListingCard({ listing, index = 0, animateIn = true }: Mark
             sizeHint="thumbnail"
             className="aspect-[4/5] w-full"
           >
+            <SaveListingHeartButton
+              listing={{
+                id: listing.id,
+                title: listing.title,
+                price: listing.price,
+                imageUrl: thumbnail?.url ?? null,
+                imageBlur: thumbnail?.blurDataURL ?? null,
+              }}
+              className="absolute right-2 top-2"
+            />
             <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
               <PriceTag
                 amount={listing.price}

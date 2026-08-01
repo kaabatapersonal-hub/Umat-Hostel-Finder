@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { AuthorLink } from "@/components/ui/author-link";
+import { PushNotificationToggle } from "./push-notification-toggle";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useMarkNotificationRead } from "@/hooks/use-mark-notification-read";
 import { useMarkAllNotificationsRead } from "@/hooks/use-mark-all-notifications-read";
@@ -35,6 +36,8 @@ function notificationHref(n: AppNotification): string | null {
       return n.referenceId ? `/hostel/${n.referenceId}` : null;
     case "admin_report":
       return "/admin/reports";
+    case "admin_broadcast":
+      return n.linkUrl;
     case "welcome":
     default:
       return null;
@@ -70,6 +73,10 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
             Mark all as read
           </button>
         )}
+      </div>
+
+      <div className="mb-3 shrink-0">
+        <PushNotificationToggle />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { BuzzPostCard } from "@/components/buzz/buzz-post-card";
+import { BadgeRow } from "@/components/profile/badge-row";
 import { usePublicProfile } from "@/hooks/use-public-profile";
+import { useProfileStats } from "@/hooks/use-profile-stats";
 import { useUserBuzzPosts } from "@/hooks/use-user-buzz-posts";
 import { useMyLikedPosts } from "@/hooks/use-my-liked-posts";
 import { useMyBuzzReports } from "@/hooks/use-my-buzz-reports";
@@ -24,6 +26,7 @@ export function PublicProfileView({ userId }: { userId: string }) {
   const isOwnProfile = user?.id === userId;
 
   const { data: profile, isPending: profilePending, isError, refetch } = usePublicProfile(userId);
+  const { data: stats } = useProfileStats(userId);
   const postsQuery = useUserBuzzPosts(userId, { includeAnonymous: isOwnProfile });
 
   const posts = useMemo(() => postsQuery.data?.pages.flatMap((page) => page.posts) ?? [], [postsQuery.data]);
@@ -73,6 +76,7 @@ export function PublicProfileView({ userId }: { userId: string }) {
             </div>
             {profile.bio && <p className="text-body-sm text-ink-500">{profile.bio}</p>}
             <span className="text-caption text-ink-300">Joined {joinedLabel}</span>
+            <BadgeRow stats={stats} />
           </div>
           {isOwnProfile && (
             <Link href="/profile/edit">

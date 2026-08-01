@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   ShieldAlert,
   BarChart3,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -46,6 +47,7 @@ const TABS: AdminTab[] = [
   { href: "/admin/users", label: "Users", icon: Users, permission: "manage_users" },
   { href: "/admin/market", label: "Market", icon: ShoppingBag, permission: "moderate_market" },
   { href: "/admin/market/new", label: "Add Product", icon: PlusCircle, permission: "moderate_market" },
+  { href: "/admin/broadcast", label: "Broadcast", icon: Megaphone, permission: "send_broadcasts" },
 ];
 
 function isTabActive(href: string, pathname: string): boolean {

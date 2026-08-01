@@ -34,6 +34,27 @@ export async function getPublicProfile(supabase: SupabaseClient<Database>, userI
     : null;
 }
 
+export interface ProfileStats {
+  reviewCount: number;
+  listingCount: number;
+  buzzPostCount: number;
+}
+
+// Backs milestone badges (src/lib/badges.ts) -- one round trip instead of
+// three separate count queries against already-public tables (reviews,
+// active market_listings, buzz_posts), same "narrow aggregate RPC"
+// posture as get_active_users_count.
+export async function getProfileStats(supabase: SupabaseClient<Database>, userId: string): Promise<ProfileStats> {
+  const { data, error } = await supabase.rpc("get_profile_stats", { p_user_id: userId });
+  if (error) throw error;
+  const row = data?.[0];
+  return {
+    reviewCount: row?.review_count ?? 0,
+    listingCount: row?.listing_count ?? 0,
+    buzzPostCount: row?.buzz_post_count ?? 0,
+  };
+}
+
 export interface UpdateProfileInput {
   username?: string | null;
   bio?: string | null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertCircle, Search, Users as UsersIcon } from "lucide-react";
+import { AlertCircle, Download, Search, Users as UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,9 @@ import { UserRow } from "@/components/admin/user-row";
 import { UserDetailSheet } from "@/components/admin/user-detail-sheet";
 import { useAdminUsers } from "@/hooks/use-admin-users";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import type { AdminUserRoleFilter } from "@/lib/queries/admin-users";
+import { getAdminUsers, type AdminUserRoleFilter } from "@/lib/queries/admin-users";
+import { downloadCsv } from "@/lib/csv-export";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const ROLE_FILTERS: { value: AdminUserRoleFilter; label: string }[] = [
@@ -22,7 +24,38 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [roleFilter, setRoleFilter] = useState<AdminUserRoleFilter>("all");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  // Exports the full table, not just whatever page is currently loaded in
+  // memory -- admin lists are paginated, so "what's on screen" would be a
+  // silently incomplete file. 10,000 comfortably covers this app's actual
+  // scale today.
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const supabase = createClient();
+      const { users: allUsers } = await getAdminUsers(supabase, { limit: 10000 });
+      downloadCsv(
+        `campa-users-${new Date().toISOString().slice(0, 10)}.csv`,
+        allUsers,
+        [
+          { header: "Name", value: (u) => u.fullName },
+          { header: "Email", value: (u) => u.email },
+          { header: "Role", value: (u) => u.role },
+          { header: "Suspended", value: (u) => u.isSuspended },
+          { header: "Verified", value: (u) => u.isVerified },
+          { header: "Joined", value: (u) => u.createdAt },
+          { header: "Reviews", value: (u) => u.reviewCount },
+          { header: "Saves", value: (u) => u.saveCount },
+          { header: "Submissions", value: (u) => u.submissionCount },
+          { header: "Owned Hostels", value: (u) => u.ownedHostelCount },
+        ]
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useAdminUsers({
     search: debouncedSearch,
@@ -32,7 +65,13 @@ export default function AdminUsersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-display text-h1 text-ink-900">Users</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-h1 text-ink-900">Users</h1>
+        <Button variant="secondary" size="sm" onClick={handleExport} loading={exporting}>
+          <Download className="size-3.5" />
+          Export CSV
+        </Button>
+      </div>
 
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <div className="flex h-12 flex-1 items-center gap-2.5 rounded-md bg-surface px-3.5 shadow-card">

@@ -4,7 +4,9 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { HostelFilters } from "@/lib/queries/hostels";
 
-const CHIP_CONFIG: { key: keyof HostelFilters; label: string }[] = [
+type BooleanFilterKey = "nearCampus" | "underBudget" | "availableNow" | "featuredOnly" | "enSuite";
+
+const CHIP_CONFIG: { key: BooleanFilterKey; label: string }[] = [
   { key: "nearCampus", label: "Near Campus" },
   { key: "underBudget", label: "Under GHS 2,000" },
   { key: "availableNow", label: "Available Now" },

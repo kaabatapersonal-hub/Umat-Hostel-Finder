@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { parseUploadedImages, type UploadedImage } from "@/lib/images";
+import { parseRoomTypes, type RoomTypeEntry } from "@/lib/room-types";
 import { haversineDistanceKm } from "@/lib/geo";
 import { UMAT_CENTER } from "@/lib/map-constants";
 
@@ -22,10 +23,11 @@ export interface MapHostelPin {
   // lib/hostel-filters.ts).
   tags: string[];
   facilities: string[];
+  roomTypes: RoomTypeEntry[];
 }
 
 const MAP_HOSTEL_COLUMNS =
-  "id, name, latitude, longitude, price_min, price_max, availability, rating_avg, rating_count, featured, featured_until, images, tags, facilities";
+  "id, name, latitude, longitude, price_min, price_max, availability, rating_avg, rating_count, featured, featured_until, images, tags, facilities, room_types";
 
 const UMAT_LATLNG = { lat: UMAT_CENTER[0], lng: UMAT_CENTER[1] };
 
@@ -64,6 +66,7 @@ export async function getMapHostels(supabase: SupabaseClient<Database>): Promise
       distanceToCampusKm: haversineDistanceKm(UMAT_LATLNG, { lat: latitude, lng: longitude }),
       tags: row.tags ?? [],
       facilities: row.facilities ?? [],
+      roomTypes: parseRoomTypes(row.room_types),
     };
   });
 }

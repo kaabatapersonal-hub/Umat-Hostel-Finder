@@ -27,6 +27,8 @@ export interface Database {
           whatsapp_number: string | null;
           phone_number: string | null;
           avatar_color: string | null;
+          seller_rating_avg: number;
+          seller_rating_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -48,6 +50,8 @@ export interface Database {
           whatsapp_number?: string | null;
           phone_number?: string | null;
           avatar_color?: string | null;
+          seller_rating_avg?: number;
+          seller_rating_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -314,6 +318,140 @@ export interface Database {
           {
             foreignKeyName: "reviews_author_id_fkey";
             columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      seller_reviews: {
+        Row: {
+          id: string;
+          seller_id: string;
+          author_id: string;
+          rating: number;
+          comment: string;
+          reviewer_name: string | null;
+          reported: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          seller_id: string;
+          author_id: string;
+          rating: number;
+          comment: string;
+          reviewer_name?: string | null;
+          reported?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          seller_id?: string;
+          author_id?: string;
+          rating?: number;
+          comment?: string;
+          reviewer_name?: string | null;
+          reported?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "seller_reviews_seller_id_fkey";
+            columns: ["seller_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "seller_reviews_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      saved_market_listings: {
+        Row: {
+          id: string;
+          user_id: string;
+          listing_id: string;
+          listing_title: string | null;
+          listing_price: number | null;
+          listing_image_url: string | null;
+          listing_image_blur: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          listing_id: string;
+          listing_title?: string | null;
+          listing_price?: number | null;
+          listing_image_url?: string | null;
+          listing_image_blur?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          listing_id?: string;
+          listing_title?: string | null;
+          listing_price?: number | null;
+          listing_image_url?: string | null;
+          listing_image_blur?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "saved_market_listings_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "saved_market_listings_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "market_listings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey";
+            columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -722,6 +860,7 @@ export interface Database {
           actor_name: string | null;
           reference_type: string | null;
           reference_id: string | null;
+          link_url: string | null;
           group_key: string | null;
           group_count: number;
           is_read: boolean;
@@ -738,6 +877,7 @@ export interface Database {
           actor_name?: string | null;
           reference_type?: string | null;
           reference_id?: string | null;
+          link_url?: string | null;
           group_key?: string | null;
           group_count?: number;
           is_read?: boolean;
@@ -754,6 +894,7 @@ export interface Database {
           actor_name?: string | null;
           reference_type?: string | null;
           reference_id?: string | null;
+          link_url?: string | null;
           group_key?: string | null;
           group_count?: number;
           is_read?: boolean;
@@ -997,6 +1138,9 @@ export interface Database {
           p_cursor_created_at?: string | null;
           p_cursor_id?: string | null;
           p_limit?: number;
+          p_price_min?: number | null;
+          p_price_max?: number | null;
+          p_room_type?: string | null;
         };
         Returns: {
           id: string;
@@ -1055,6 +1199,26 @@ export interface Database {
           created_at: string;
         }[];
       };
+      get_profile_stats: {
+        Args: { p_user_id: string };
+        Returns: { review_count: number; listing_count: number; buzz_post_count: number }[];
+      };
+      get_push_subscriptions_for_user: {
+        Args: { p_user_id: string; p_dispatch_secret: string };
+        Returns: { endpoint: string; p256dh: string; auth: string }[];
+      };
+      delete_dead_push_subscriptions: {
+        Args: { p_endpoints: string[]; p_dispatch_secret: string };
+        Returns: undefined;
+      };
+      send_admin_broadcast: {
+        Args: { p_title: string; p_body: string; p_link?: string | null };
+        Returns: number;
+      };
+      report_seller_review: {
+        Args: { p_review_id: string };
+        Returns: undefined;
+      };
       get_seller_public_profile: {
         Args: { p_seller_id: string };
         Returns: {
@@ -1064,6 +1228,8 @@ export interface Database {
           leaving_date: string | null;
           is_verified: boolean;
           verification_label: string | null;
+          seller_rating_avg: number;
+          seller_rating_count: number;
         }[];
       };
       set_user_verified: {
@@ -1166,9 +1332,22 @@ export type ProfileRole = "student" | "admin";
 // in anyone's admin_permissions array (see set_user_role's own CHECK);
 // promoting/demoting and setting permissions is super-admin-only,
 // checked via is_super_admin() directly, not the permission array.
-export type AdminPermission = "manage_hostels" | "manage_users" | "moderate_buzz" | "moderate_reviews" | "moderate_market";
+export type AdminPermission =
+  | "manage_hostels"
+  | "manage_users"
+  | "moderate_buzz"
+  | "moderate_reviews"
+  | "moderate_market"
+  | "send_broadcasts";
 export type SubmissionStatus = "pending" | "approved" | "rejected";
-export type NotificationType = "buzz_reply" | "buzz_like" | "buzz_pin" | "hostel_update" | "admin_report" | "welcome";
+export type NotificationType =
+  | "buzz_reply"
+  | "buzz_like"
+  | "buzz_pin"
+  | "hostel_update"
+  | "admin_report"
+  | "welcome"
+  | "admin_broadcast";
 export type RoommateRequestStatus = "pending" | "accepted" | "declined";
 export type MarketCategory =
   | "hostel_essentials"

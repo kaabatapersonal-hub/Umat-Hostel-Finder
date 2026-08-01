@@ -4,19 +4,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Search, Building2, AlertCircle, Map as MapIcon } from "lucide-react";
+import { Search, Building2, AlertCircle, Map as MapIcon, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { MarketBanner } from "@/components/market/market-banner";
 import { FilterChips } from "./filter-chips";
+import { HostelFiltersSheet } from "./hostel-filters-sheet";
 import { HostelCard } from "./hostel-card";
 import { useHostels } from "@/hooks/use-hostels";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAuth } from "@/providers/auth-provider";
 import { useHostelFilters } from "@/hooks/use-hostel-filters";
 import { DEFAULT_FILTERS, hasActiveFilters, type GetHostelsResult } from "@/lib/queries/hostels";
+import { cn } from "@/lib/utils";
 
 // Reads sessionStorage to decide whether to render at all -- genuinely
 // unavailable server-side, not just inconvenient. Rendering it during SSR
@@ -37,6 +39,7 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
   // URL-synced (Session 9.5) so the Map tab reads/writes the exact same
   // filter state -- see hooks/use-hostel-filters.ts.
   const { filters, setFilters, queryString } = useHostelFilters();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const router = useRouter();
   const { requireAuth } = useAuth();
@@ -129,6 +132,19 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
               className="w-full bg-transparent text-body text-ink-900 placeholder:text-ink-300 focus:outline-none"
             />
           </div>
+          <button
+            type="button"
+            aria-label="Filters"
+            onClick={() => setFiltersOpen(true)}
+            className={cn(
+              "flex h-12 w-12 shrink-0 items-center justify-center rounded-md shadow-card transition-colors",
+              filters.priceMin != null || filters.priceMax != null || !!filters.roomType
+                ? "bg-gold-500 text-ink-900"
+                : "bg-surface text-ink-500"
+            )}
+          >
+            <SlidersHorizontal className="size-5" />
+          </button>
         </div>
       </section>
 
@@ -139,6 +155,8 @@ export function HomeFeed({ initialData }: { initialData?: GetHostelsResult }) {
       <div className="mx-auto w-full max-w-7xl">
         <FilterChips value={filters} onChange={setFilters} />
       </div>
+
+      <HostelFiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} onApply={setFilters} />
 
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pb-6 lg:px-6">
         <div className="flex items-center justify-between">

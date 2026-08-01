@@ -11,7 +11,9 @@ import { PriceTag } from "@/components/ui/price-tag";
 import { LinkifiedContent } from "@/components/ui/linkified-content";
 import { MarketGallery } from "./market-gallery";
 import { SellerInfoCard } from "./seller-info-card";
+import { SellerReviewsSection } from "./seller-reviews-section";
 import { RelatedMarketListingsSection } from "./related-market-listings-section";
+import { useSellerInfo } from "@/hooks/use-seller-info";
 import { useMarketListing } from "@/hooks/use-market-listing";
 import { useIncrementListingViews } from "@/hooks/use-increment-listing-views";
 import { useHostelOptions } from "@/hooks/use-hostel-options";
@@ -38,6 +40,7 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
   const { data: myClaims } = useMyListingClaims(listing?.isUnclaimed ? [listingId] : []);
   const requestClaim = useRequestListingClaim();
   const myClaimStatus = myClaims?.get(listingId);
+  const { data: sellerInfo } = useSellerInfo(listing?.sellerId ?? "");
 
   useEffect(() => {
     if (hasCountedView.current) return;
@@ -87,7 +90,17 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
 
   return (
     <div className="flex flex-col gap-5 pb-8">
-      <MarketGallery images={listing.images} title={listing.title} />
+      <MarketGallery
+        images={listing.images}
+        title={listing.title}
+        listing={{
+          id: listing.id,
+          title: listing.title,
+          price: listing.price,
+          imageUrl: listing.images[0]?.url ?? null,
+          imageBlur: listing.images[0]?.blurDataURL ?? null,
+        }}
+      />
 
       <div className="flex flex-col gap-4 px-4">
         <div className="flex flex-col gap-2">
@@ -200,6 +213,14 @@ export function MarketListingDetailView({ listingId }: { listingId: string }) {
           </div>
         ) : (
           <SellerInfoCard sellerId={listing.sellerId} />
+        )}
+
+        {!listing.isUnclaimed && (
+          <SellerReviewsSection
+            sellerId={listing.sellerId}
+            ratingAvg={sellerInfo?.profile?.sellerRatingAvg ?? 0}
+            ratingCount={sellerInfo?.profile?.sellerRatingCount ?? 0}
+          />
         )}
 
         {hostelName && (

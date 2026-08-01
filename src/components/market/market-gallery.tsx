@@ -6,7 +6,9 @@ import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartImage } from "@/components/ui/smart-image";
+import { SaveListingHeartButton } from "./save-listing-heart-button";
 import type { UploadedImage } from "@/lib/images";
+import type { SaveableListingInput } from "@/lib/queries/saved-market-listings";
 
 // Same code-splitting reasoning as the hostel gallery -- the lightbox
 // library only matters once someone taps a photo.
@@ -17,12 +19,12 @@ const PhotoLightbox = dynamic(() => import("@/components/hostel-details/photo-li
 export interface MarketGalleryProps {
   images: UploadedImage[];
   title: string;
+  listing: SaveableListingInput;
 }
 
-// Same shape as hostel-details/image-gallery.tsx, minus the SaveHeartButton
-// overlay -- saved/favorited listings are explicitly out of scope this
-// session.
-export function MarketGallery({ images, title }: MarketGalleryProps) {
+// Same shape as hostel-details/image-gallery.tsx, including the same
+// heart-overlay placement now that saved/favorited listings exist.
+export function MarketGallery({ images, title, listing }: MarketGalleryProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -81,6 +83,8 @@ export function MarketGallery({ images, title }: MarketGalleryProps) {
       >
         <ArrowLeft className="size-5" />
       </button>
+
+      <SaveListingHeartButton listing={listing} size="lg" className="absolute right-3 top-3" />
 
       {hasImages && images.length > 1 && (
         <>

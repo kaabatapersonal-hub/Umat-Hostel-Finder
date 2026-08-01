@@ -29,6 +29,9 @@ export interface HostelFilters {
   availableNow: boolean;
   featuredOnly: boolean;
   enSuite: boolean;
+  priceMin: number | null;
+  priceMax: number | null;
+  roomType: string | null;
 }
 
 export const DEFAULT_FILTERS: HostelFilters = {
@@ -37,10 +40,22 @@ export const DEFAULT_FILTERS: HostelFilters = {
   availableNow: false,
   featuredOnly: false,
   enSuite: false,
+  priceMin: null,
+  priceMax: null,
+  roomType: null,
 };
 
 export function hasActiveFilters(filters: HostelFilters): boolean {
-  return Object.values(filters).some(Boolean);
+  return (
+    filters.nearCampus ||
+    filters.underBudget ||
+    filters.availableNow ||
+    filters.featuredOnly ||
+    filters.enSuite ||
+    filters.priceMin != null ||
+    filters.priceMax != null ||
+    !!filters.roomType
+  );
 }
 
 export interface HostelCursor {
@@ -80,6 +95,9 @@ export async function getHostels(
     p_available_now: filters.availableNow,
     p_featured_only: filters.featuredOnly,
     p_en_suite: filters.enSuite,
+    p_price_min: filters.priceMin,
+    p_price_max: filters.priceMax,
+    p_room_type: filters.roomType,
     p_cursor_featured: cursor?.featured ?? null,
     p_cursor_created_at: cursor?.createdAt ?? null,
     p_cursor_id: cursor?.id ?? null,

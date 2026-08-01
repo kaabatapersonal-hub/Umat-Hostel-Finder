@@ -21,7 +21,11 @@ import { useMyOwnedHostels } from "@/hooks/use-my-owned-hostels";
 import { useMyMarketListings } from "@/hooks/use-my-market-listings";
 import { useSetMarketListingStatus } from "@/hooks/use-set-market-listing-status";
 import { useDeleteMarketListing } from "@/hooks/use-delete-market-listing";
+import { useSavedMarketListings } from "@/hooks/use-saved-market-listings";
+import { useProfileStats } from "@/hooks/use-profile-stats";
 import { LeavingCampusToggle } from "@/components/market/leaving-campus-toggle";
+import { SavedMarketListingRow } from "@/components/market/saved-market-listing-row";
+import { BadgeRow } from "@/components/profile/badge-row";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import type { SubmissionSummary } from "@/lib/queries/submissions";
 import type { MarketListing } from "@/lib/queries/market";
@@ -158,6 +162,8 @@ export default function ProfilePage() {
   const { data: submissions = [], isPending: submissionsPending } = useMySubmissions();
   const { data: ownedHostels = [], isPending: ownedPending } = useMyOwnedHostels();
   const { data: marketListings = [], isPending: marketListingsPending } = useMyMarketListings(user?.id);
+  const { data: savedListings = [], isPending: savedListingsPending } = useSavedMarketListings();
+  const { data: stats } = useProfileStats(user?.id);
 
   if (loading) {
     return (
@@ -200,6 +206,7 @@ export default function ProfilePage() {
             {profile?.isVerified && <VerifiedBadge label={profile.verificationLabel} />}
           </div>
           <span className="line-clamp-1 text-body-sm text-ink-500">{profile?.email ?? user.email}</span>
+          <BadgeRow stats={stats} />
         </div>
         <Link href="/profile/edit" className="shrink-0">
           <Button variant="ghost" size="sm">
@@ -342,6 +349,21 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+
+      {(savedListingsPending || savedListings.length > 0) && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-h1 text-ink-900">Saved Listings</h2>
+          {savedListingsPending ? (
+            <SkeletonRow />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {savedListings.map((saved) => (
+                <SavedMarketListingRow key={saved.id} saved={saved} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <Button variant="secondary" size="lg" onClick={() => signOut()} className="mt-2">
         <LogOut className="size-4" />

@@ -1,11 +1,14 @@
 import type { HostelFilters } from "@/lib/queries/hostels";
+import type { RoomTypeEntry } from "@/lib/room-types";
 
 export interface FilterableHostel {
   tags: string[];
   priceMin: number | null;
+  priceMax: number | null;
   availability: string;
   isActivelyFeatured: boolean;
   facilities: string[];
+  roomTypes: RoomTypeEntry[];
 }
 
 // The "Under GHS 2,000" threshold, kept in one place. Mirrors the literal
@@ -24,5 +27,8 @@ export function hostelMatchesFilters(hostel: FilterableHostel, filters: HostelFi
   if (filters.availableNow && hostel.availability !== "available") return false;
   if (filters.featuredOnly && !hostel.isActivelyFeatured) return false;
   if (filters.enSuite && !(hostel.facilities.includes("en_suite") || hostel.tags.includes("en_suite"))) return false;
+  if (filters.priceMin != null && !(hostel.priceMax != null && hostel.priceMax >= filters.priceMin)) return false;
+  if (filters.priceMax != null && !(hostel.priceMin != null && hostel.priceMin <= filters.priceMax)) return false;
+  if (filters.roomType && !hostel.roomTypes.some((rt) => rt.type === filters.roomType)) return false;
   return true;
 }

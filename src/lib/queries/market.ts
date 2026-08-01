@@ -471,6 +471,8 @@ export interface SellerPublicProfile {
   leavingDate: string | null;
   isVerified: boolean;
   verificationLabel: string | null;
+  sellerRatingAvg: number;
+  sellerRatingCount: number;
 }
 
 // Uses get_seller_public_profile rather than a plain profiles select --
@@ -491,6 +493,8 @@ export async function getSellerPublicProfile(
         leavingDate: row.leaving_date,
         isVerified: row.is_verified,
         verificationLabel: row.verification_label,
+        sellerRatingAvg: row.seller_rating_avg,
+        sellerRatingCount: row.seller_rating_count,
       }
     : null;
 }

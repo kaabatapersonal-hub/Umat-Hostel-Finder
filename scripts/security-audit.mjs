@@ -78,6 +78,13 @@ const STRANGER_PASSWORD = process.env.SECURITY_AUDIT_STRANGER_PASSWORD || "Audit
 const OWNER_EMAIL = process.env.SECURITY_AUDIT_OWNER_EMAIL || `${adminLocal}+audit-owner@${adminDomain}`;
 const OWNER_PASSWORD = process.env.SECURITY_AUDIT_OWNER_PASSWORD || "AuditOwner123!";
 
+// Optional -- only needed to test get_push_subscriptions_for_user's actual
+// success path (the negative "wrong secret rejected" tests don't need the
+// real value). Must match whatever's stored in app_secrets.push_dispatch_secret
+// on the live database, same value PUSH_DISPATCH_SECRET holds for the
+// deployed dispatch route.
+const PUSH_DISPATCH_SECRET = process.env.PUSH_DISPATCH_SECRET;
+
 // ---------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------
@@ -2691,6 +2698,334 @@ async function main() {
     for (const id of [claimedListingId, unclaimedListingId]) {
       if (id) await del(adminToken, `/market_listings?id=eq.${id}`);
     }
+  }
+
+  // =====================================================================
+  // Marketplace save/favorite listings (Growth features session) --
+  // mirrors saved_hostels' own test shape exactly.
+  // =====================================================================
+  section("market: saved listings");
+  {
+    // admin-owned test listing (admin bypasses the rate limit, so this
+    // doesn't consume the stranger's hourly budget for later sections).
+    const testListing = await post(
+      adminToken,
+      "/market_listings",
+      { seller_id: admin.user.id, title: "[Market Audit] Save target", price: 10, category: "other", contact: "233200000000" },
+      "return=representation"
+    );
+    const testListingId = testListing.body?.[0]?.id;
+
+    const anonSave = await post(null, "/saved_market_listings", { user_id: strangerUid, listing_id: testListingId });
+    check("anon cannot save a market listing", !anonSave.ok, `status ${anonSave.status}`);
+
+    const spoofSave = await post(strangerToken, "/saved_market_listings", { user_id: admin.user.id, listing_id: testListingId });
+    check("stranger cannot spoof user_id when saving a listing", !spoofSave.ok, `status ${spoofSave.status}`);
+
+    const save = await post(
+      strangerToken,
+      "/saved_market_listings",
+      { user_id: strangerUid, listing_id: testListingId, listing_title: "[Market Audit] Save target", listing_price: 10 },
+      "return=representation"
+    );
+    check("stranger can save a market listing", save.ok && save.body?.[0]?.listing_id === testListingId, JSON.stringify(save.body));
+
+    const duplicateSave = await post(strangerToken, "/saved_market_listings", { user_id: strangerUid, listing_id: testListingId });
+    check("saving the same listing twice is rejected (unique constraint)", !duplicateSave.ok, `status ${duplicateSave.status}`);
+
+    const selfRead = await get(strangerToken, `/saved_market_listings?user_id=eq.${strangerUid}&listing_id=eq.${testListingId}&select=id`);
+    check("stranger CAN read their own saved listings", selfRead.body?.length === 1, JSON.stringify(selfRead.body));
+
+    if (hasDistinctOwner) {
+      const otherRead = await get(ownerToken, `/saved_market_listings?user_id=eq.${strangerUid}&select=id`);
+      check("a different user cannot read someone else's saved listings", (otherRead.body ?? []).length === 0, JSON.stringify(otherRead.body));
+    } else {
+      skip("a different user cannot read someone else's saved listings", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const adminRead = await get(adminToken, `/saved_market_listings?user_id=eq.${strangerUid}&listing_id=eq.${testListingId}&select=id`);
+    check("admin CAN read any user's saved listings", adminRead.body?.length === 1, JSON.stringify(adminRead.body));
+
+    const unsave = await del(strangerToken, `/saved_market_listings?user_id=eq.${strangerUid}&listing_id=eq.${testListingId}`);
+    const afterUnsave = await get(adminToken, `/saved_market_listings?user_id=eq.${strangerUid}&listing_id=eq.${testListingId}&select=id`);
+    check("stranger can unsave a listing", unsave.ok && (afterUnsave.body ?? []).length === 0, JSON.stringify(afterUnsave.body));
+
+    if (testListingId) await del(adminToken, `/market_listings?id=eq.${testListingId}`);
+  }
+
+  // =====================================================================
+  // Marketplace seller reviews (Growth features session) -- mirrors
+  // reviews' own test shape, minus the honest-badge logic (see the
+  // migration's own comment on why seller reviews have no equivalent).
+  // =====================================================================
+  section("market: seller reviews");
+  {
+    // Reset to a known baseline in case a previous interrupted run left a
+    // stray review behind.
+    const leftovers = await get(strangerToken, `/seller_reviews?author_id=eq.${strangerUid}&select=id`);
+    for (const row of leftovers.body ?? []) await del(adminToken, `/seller_reviews?id=eq.${row.id}`);
+
+    const anonReview = await post(null, "/seller_reviews", {
+      seller_id: admin.user.id,
+      author_id: strangerUid,
+      rating: 5,
+      comment: "Great seller, fast response and item was as described.",
+    });
+    check("anon cannot post a seller review", !anonReview.ok, `status ${anonReview.status}`);
+
+    const selfReview = await post(strangerToken, "/seller_reviews", {
+      seller_id: strangerUid,
+      author_id: strangerUid,
+      rating: 5,
+      comment: "Reviewing myself, this should be rejected outright.",
+    });
+    check("a seller cannot review themselves (CHECK constraint)", !selfReview.ok, `status ${selfReview.status}`);
+
+    const shortComment = await post(strangerToken, "/seller_reviews", {
+      seller_id: admin.user.id,
+      author_id: strangerUid,
+      rating: 5,
+      comment: "too short",
+    });
+    check("a comment under 15 chars is rejected (CHECK constraint)", !shortComment.ok, `status ${shortComment.status}`);
+
+    const badRating = await post(strangerToken, "/seller_reviews", {
+      seller_id: admin.user.id,
+      author_id: strangerUid,
+      rating: 9,
+      comment: "Rating out of range, this should be rejected too.",
+    });
+    check("a rating outside 1-5 is rejected (CHECK constraint)", !badRating.ok, `status ${badRating.status}`);
+
+    const ratingBefore = await get(adminToken, `/profiles?id=eq.${admin.user.id}&select=seller_rating_avg,seller_rating_count`);
+
+    const review = await post(
+      strangerToken,
+      "/seller_reviews",
+      { seller_id: admin.user.id, author_id: strangerUid, rating: 4, comment: "Solid seller, responded quickly on WhatsApp." },
+      "return=representation"
+    );
+    check("stranger CAN review a different seller", review.ok && review.body?.[0]?.rating === 4, JSON.stringify(review.body));
+    const reviewId = review.body?.[0]?.id;
+
+    const ratingAfter = await get(adminToken, `/profiles?id=eq.${admin.user.id}&select=seller_rating_avg,seller_rating_count`);
+    check(
+      "posting a review recalculates the seller's cached rating on profiles",
+      ratingAfter.body?.[0]?.seller_rating_count === (ratingBefore.body?.[0]?.seller_rating_count ?? 0) + 1,
+      JSON.stringify({ before: ratingBefore.body, after: ratingAfter.body })
+    );
+
+    const duplicateReview = await post(strangerToken, "/seller_reviews", {
+      seller_id: admin.user.id,
+      author_id: strangerUid,
+      rating: 3,
+      comment: "Reviewing the same seller a second time, should fail.",
+    });
+    check("reviewing the same seller twice is rejected (unique constraint)", !duplicateReview.ok, `status ${duplicateReview.status}`);
+
+    if (hasDistinctOwner) {
+      const otherEdits = await patch(ownerToken, `/seller_reviews?id=eq.${reviewId}`, { rating: 1 }, "return=representation");
+      check("a different non-admin cannot edit someone else's seller review", !otherEdits.body || otherEdits.body.length === 0);
+    } else {
+      skip("a different non-admin cannot edit someone else's seller review", "owner account not confirmed -- no second distinct identity available");
+    }
+
+    const adminEdits = await patch(adminToken, `/seller_reviews?id=eq.${reviewId}`, { rating: 2 }, "return=representation");
+    check("admin (moderate_market) CAN edit any seller review", adminEdits.ok && adminEdits.body?.[0]?.rating === 2, JSON.stringify(adminEdits.body));
+
+    const anonReport = await rpc(null, "report_seller_review", { p_review_id: reviewId });
+    check("anon cannot call report_seller_review", !anonReport.ok, `status ${anonReport.status}`);
+
+    const report = await rpc(strangerToken, "report_seller_review", { p_review_id: reviewId });
+    const afterReport = await get(adminToken, `/seller_reviews?id=eq.${reviewId}&select=reported`);
+    check("an authenticated user CAN report a seller review", report.ok && afterReport.body?.[0]?.reported === true, JSON.stringify(afterReport.body));
+
+    const ratingBeforeDelete = await get(adminToken, `/profiles?id=eq.${admin.user.id}&select=seller_rating_count`);
+    await del(strangerToken, `/seller_reviews?id=eq.${reviewId}`);
+    const ratingAfterDelete = await get(adminToken, `/profiles?id=eq.${admin.user.id}&select=seller_rating_count`);
+    check(
+      "deleting a review recalculates the seller's cached rating back down",
+      ratingAfterDelete.body?.[0]?.seller_rating_count === (ratingBeforeDelete.body?.[0]?.seller_rating_count ?? 1) - 1,
+      JSON.stringify({ before: ratingBeforeDelete.body, after: ratingAfterDelete.body })
+    );
+  }
+
+  // =====================================================================
+  // Push notification subscriptions (Growth features session) --
+  // push_subscriptions is user-scoped like saved_hostels, but the
+  // dispatch-route lookup (get_push_subscriptions_for_user) is a
+  // deliberately narrow, secret-gated exception -- not even admin can
+  // read another user's subscription directly, only that one RPC with the
+  // right secret can.
+  // =====================================================================
+  section("push notifications");
+  {
+    const leftovers = await get(strangerToken, `/push_subscriptions?user_id=eq.${strangerUid}&select=id,endpoint`);
+    for (const row of leftovers.body ?? []) await del(adminToken, `/push_subscriptions?id=eq.${row.id}`);
+
+    const testEndpoint = `https://fcm.googleapis.com/fcm/send/security-audit-${Date.now()}`;
+
+    const anonInsert = await post(null, "/push_subscriptions", {
+      user_id: strangerUid,
+      endpoint: testEndpoint,
+      p256dh: "test-p256dh-key",
+      auth: "test-auth-key",
+    });
+    check("anon cannot register a push subscription", !anonInsert.ok, `status ${anonInsert.status}`);
+
+    const spoofInsert = await post(strangerToken, "/push_subscriptions", {
+      user_id: admin.user.id,
+      endpoint: testEndpoint,
+      p256dh: "test-p256dh-key",
+      auth: "test-auth-key",
+    });
+    check("stranger cannot spoof user_id on a push subscription", !spoofInsert.ok, `status ${spoofInsert.status}`);
+
+    const subscribe = await post(
+      strangerToken,
+      "/push_subscriptions",
+      { user_id: strangerUid, endpoint: testEndpoint, p256dh: "test-p256dh-key", auth: "test-auth-key" },
+      "return=representation"
+    );
+    check("stranger can register their own push subscription", subscribe.ok && subscribe.body?.[0]?.endpoint === testEndpoint, JSON.stringify(subscribe.body));
+
+    const selfRead = await get(strangerToken, `/push_subscriptions?endpoint=eq.${encodeURIComponent(testEndpoint)}&select=id`);
+    check("stranger CAN read their own push subscription", selfRead.body?.length === 1, JSON.stringify(selfRead.body));
+
+    const adminDirectRead = await get(adminToken, `/push_subscriptions?endpoint=eq.${encodeURIComponent(testEndpoint)}&select=id`);
+    check(
+      "even admin cannot read someone else's push subscription directly (only the secret-gated RPC can)",
+      (adminDirectRead.body ?? []).length === 0,
+      JSON.stringify(adminDirectRead.body)
+    );
+
+    const noSecret = await rpc(adminToken, "get_push_subscriptions_for_user", { p_user_id: strangerUid, p_dispatch_secret: "" });
+    check("get_push_subscriptions_for_user rejects an empty secret", !noSecret.ok, `status ${noSecret.status}`);
+
+    const wrongSecret = await rpc(adminToken, "get_push_subscriptions_for_user", {
+      p_user_id: strangerUid,
+      p_dispatch_secret: "definitely-not-the-real-secret",
+    });
+    check("get_push_subscriptions_for_user rejects an incorrect secret", !wrongSecret.ok, `status ${wrongSecret.status}`);
+
+    if (PUSH_DISPATCH_SECRET) {
+      const rightSecret = await rpc(null, "get_push_subscriptions_for_user", {
+        p_user_id: strangerUid,
+        p_dispatch_secret: PUSH_DISPATCH_SECRET,
+      });
+      check(
+        "get_push_subscriptions_for_user (anon-callable) returns the subscription with the correct secret",
+        rightSecret.ok && (rightSecret.body ?? []).some((s) => s.endpoint === testEndpoint),
+        JSON.stringify(rightSecret.body)
+      );
+
+      const wrongSecretDelete = await rpc(null, "delete_dead_push_subscriptions", {
+        p_endpoints: [testEndpoint],
+        p_dispatch_secret: "wrong",
+      });
+      check("delete_dead_push_subscriptions rejects an incorrect secret", !wrongSecretDelete.ok, `status ${wrongSecretDelete.status}`);
+
+      const rightSecretDelete = await rpc(null, "delete_dead_push_subscriptions", {
+        p_endpoints: [testEndpoint],
+        p_dispatch_secret: PUSH_DISPATCH_SECRET,
+      });
+      const afterDelete = await get(adminToken, `/push_subscriptions?endpoint=eq.${encodeURIComponent(testEndpoint)}&select=id`);
+      check(
+        "delete_dead_push_subscriptions with the correct secret removes the subscription",
+        rightSecretDelete.ok && (afterDelete.body ?? []).length === 0,
+        JSON.stringify(afterDelete.body)
+      );
+    } else {
+      skip(
+        "get_push_subscriptions_for_user (anon-callable) returns the subscription with the correct secret",
+        "PUSH_DISPATCH_SECRET not set in the environment running this audit -- can't exercise the real-secret path"
+      );
+      skip("delete_dead_push_subscriptions rejects an incorrect secret", "PUSH_DISPATCH_SECRET not set");
+      skip("delete_dead_push_subscriptions with the correct secret removes the subscription", "PUSH_DISPATCH_SECRET not set");
+      // Clean up directly since the secret-gated path above didn't run.
+      await del(strangerToken, `/push_subscriptions?endpoint=eq.${encodeURIComponent(testEndpoint)}`);
+    }
+  }
+
+  // =====================================================================
+  // Hostel price/room-type filters + profile stats (Growth features
+  // session) -- read-only smoke tests against real, live data (no test
+  // hostels created), matching the existing "just confirm the RPC is
+  // callable and returns something shaped right" depth other filter
+  // params in this file already get.
+  // =====================================================================
+  section("hostels: price/room-type filters + profile stats");
+  {
+    const feedCall = await rpc(null, "get_hostel_feed", { p_limit: 5 });
+    check("get_hostel_feed is anon-callable and returns an array", feedCall.ok && Array.isArray(feedCall.body), JSON.stringify(feedCall.body)?.slice(0, 200));
+
+    const priceFiltered = await rpc(null, "get_hostel_feed", { p_price_min: 100000, p_limit: 20 });
+    check(
+      "get_hostel_feed p_price_min filters out hostels entirely below that price",
+      priceFiltered.ok && (priceFiltered.body ?? []).every((h) => h.price_max == null || h.price_max >= 100000),
+      JSON.stringify(priceFiltered.body)?.slice(0, 200)
+    );
+
+    const roomTypeFiltered = await rpc(null, "get_hostel_feed", { p_room_type: "2_in_room", p_limit: 20 });
+    check(
+      "get_hostel_feed p_room_type only returns hostels offering that room type",
+      roomTypeFiltered.ok &&
+        (roomTypeFiltered.body ?? []).every((h) => (h.room_types ?? []).some((rt) => rt.type === "2_in_room")),
+      JSON.stringify(roomTypeFiltered.body)?.slice(0, 200)
+    );
+
+    const statsCall = await rpc(null, "get_profile_stats", { p_user_id: admin.user.id });
+    const statsRow = statsCall.body?.[0];
+    check(
+      "get_profile_stats is anon-callable and returns numeric counts",
+      statsCall.ok && typeof statsRow?.review_count === "number" && typeof statsRow?.listing_count === "number" && typeof statsRow?.buzz_post_count === "number",
+      JSON.stringify(statsCall.body)
+    );
+
+    const sellerProfileCall = await rpc(null, "get_seller_public_profile", { p_seller_id: admin.user.id });
+    const sellerProfileRow = sellerProfileCall.body?.[0];
+    check(
+      "get_seller_public_profile now also exposes seller_rating_avg/seller_rating_count",
+      sellerProfileCall.ok && sellerProfileRow && "seller_rating_avg" in sellerProfileRow && "seller_rating_count" in sellerProfileRow,
+      JSON.stringify(sellerProfileCall.body)
+    );
+  }
+
+  // =====================================================================
+  // Admin broadcast (Growth features session) -- authorization only.
+  // Deliberately NEVER actually invokes a successful send_admin_broadcast
+  // against this live database: unlike every other RPC this audit
+  // exercises end-to-end, a real broadcast fans out one visible
+  // notification (and, once the push pipeline is wired up, a real OS
+  // push) to every non-suspended user on the platform -- including real
+  // students, not just test accounts. That side effect is never
+  // acceptable from an automated test run. The success path is covered by
+  // code review + manual, deliberate testing instead.
+  // =====================================================================
+  section("admin broadcast (authorization only)");
+  {
+    const anonBroadcast = await rpc(null, "send_admin_broadcast", { p_title: "test", p_body: "test" });
+    check("anon cannot call send_admin_broadcast", !anonBroadcast.ok, `status ${anonBroadcast.status}`);
+
+    const nonAdminBroadcast = await rpc(strangerToken, "send_admin_broadcast", { p_title: "test", p_body: "test" });
+    check("a non-admin cannot call send_admin_broadcast", !nonAdminBroadcast.ok, `status ${nonAdminBroadcast.status}`);
+
+    // A sub-admin without send_broadcasts specifically -- promoted with an
+    // unrelated permission only, same temporary-promote-then-demote shape
+    // as every other "sub-admin WITHOUT X cannot Y" check in this file.
+    const promote = await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "admin", p_permissions: ["moderate_buzz"] });
+    if (promote.ok) {
+      const subAdminBroadcast = await rpc(strangerToken, "send_admin_broadcast", { p_title: "test", p_body: "test" });
+      check("a sub-admin WITHOUT send_broadcasts cannot call send_admin_broadcast", !subAdminBroadcast.ok, `status ${subAdminBroadcast.status}`);
+    } else {
+      skip("a sub-admin WITHOUT send_broadcasts cannot call send_admin_broadcast", "promotion setup failed");
+    }
+    await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "student" });
+
+    const badPermission = await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "admin", p_permissions: ["not_a_real_permission"] });
+    check("set_user_role rejects an unknown permission key (still true after adding send_broadcasts)", !badPermission.ok, `status ${badPermission.status}`);
+    // Defensive reset in case the above unexpectedly partially applied.
+    await rpc(adminToken, "set_user_role", { p_user_id: strangerUid, p_role: "student" });
   }
 
   // =====================================================================

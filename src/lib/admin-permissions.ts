@@ -10,6 +10,7 @@ export const PERMISSION_OPTIONS: { value: AdminPermission; label: string; descri
   { value: "moderate_reviews", label: "Moderate reviews", description: "Delete reported reviews" },
   { value: "moderate_market", label: "Moderate marketplace", description: "Delete listings, toggle the marketplace flag" },
   { value: "manage_users", label: "Manage users", description: "View, verify, suspend (not promote/demote)" },
+  { value: "send_broadcasts", label: "Send broadcasts", description: "Send a notification to every user" },
 ];
 
 // Structurally typed (not importing Profile from auth-provider) to avoid

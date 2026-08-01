@@ -5,6 +5,7 @@ import { QueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ConditionalAppShell } from "@/components/layout/conditional-app-shell";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { OnboardingCarousel } from "@/components/onboarding/onboarding-carousel";
 import { NotificationsRealtimeSync } from "@/components/notifications/notifications-realtime-sync";
 import { ToastProvider } from "@/components/ui/toast";
 import { getSiteUrl } from "@/lib/site-url";
@@ -98,6 +99,7 @@ export default function RootLayout({
           <ToastProvider>
             <AuthProvider>
               <ConditionalAppShell>{children}</ConditionalAppShell>
+              <OnboardingCarousel />
               <InstallPrompt />
               <NotificationsRealtimeSync />
             </AuthProvider>

@@ -4,6 +4,7 @@ import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { useSellerInfo } from "@/hooks/use-seller-info";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { StarRating } from "@/components/reviews/star-rating";
 
 export function SellerInfoCard({ sellerId }: { sellerId: string }) {
   const { data, isPending } = useSellerInfo(sellerId);
@@ -27,6 +28,14 @@ export function SellerInfoCard({ sellerId }: { sellerId: string }) {
           {joinedAt && `Joined ${formatRelativeTime(joinedAt)} · `}
           {data?.activeListingCount ?? 0} active listing{data?.activeListingCount === 1 ? "" : "s"}
         </span>
+        {!!data?.profile?.sellerRatingCount && (
+          <div className="flex items-center gap-1.5">
+            <StarRating rating={Math.round(data.profile.sellerRatingAvg)} size="sm" />
+            <span className="text-caption text-ink-500">
+              {data.profile.sellerRatingAvg.toFixed(1)} ({data.profile.sellerRatingCount})
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
