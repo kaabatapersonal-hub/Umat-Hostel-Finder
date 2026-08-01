@@ -98,12 +98,16 @@ export function ImageGallery({ images, hostel, whatsappNumber }: ImageGalleryPro
         type="button"
         aria-label="Go back"
         onClick={() => router.back()}
-        className="absolute left-3 top-3 flex size-11 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
+        style={{ top: "calc(0.75rem + env(safe-area-inset-top))" }}
+        className="absolute left-3 flex size-11 items-center justify-center rounded-full bg-ink-900/40 text-white backdrop-blur-sm"
       >
         <ArrowLeft className="size-5" />
       </button>
 
-      <div className="absolute right-3 top-3 flex items-center gap-2">
+      <div
+        style={{ top: "calc(0.75rem + env(safe-area-inset-top))" }}
+        className="absolute right-3 flex items-center gap-2"
+      >
         {!user && (
           <button
             type="button"

@@ -7,7 +7,7 @@ import Link from "next/link";
 // not a cold marketing landing.
 export function LegalHeader() {
   return (
-    <header className="border-b border-line bg-surface">
+    <header className="border-b border-line bg-surface" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Link href="/about" className="font-display text-h2 text-brand-800">
           Campa
