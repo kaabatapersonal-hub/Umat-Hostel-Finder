@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAuth } from "@/providers/auth-provider";
 import { useUpdateProfile } from "@/hooks/use-update-profile";
-import { normalizePhoneNumber } from "@/lib/contact";
+import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/contact";
 import { usernameError, USERNAME_MAX_LENGTH } from "@/lib/username";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,8 @@ export default function EditProfilePage() {
   const [phone, setPhone] = useState("");
   const [hasHydrated, setHasHydrated] = useState(false);
   const [usernameErrorMsg, setUsernameErrorMsg] = useState<string | undefined>(undefined);
+  const [whatsappErrorMsg, setWhatsappErrorMsg] = useState<string | undefined>(undefined);
+  const [phoneErrorMsg, setPhoneErrorMsg] = useState<string | undefined>(undefined);
 
   // Prefills once, the first time the real profile arrives -- not on
   // every profile change, or the user's own in-progress edits would get
@@ -65,12 +67,32 @@ export default function EditProfilePage() {
     }
     setUsernameErrorMsg(undefined);
 
+    // Previously any unparseable input here (e.g. stray letters) silently
+    // normalized down to an empty string and saved with no feedback at
+    // all -- the user would see "Profile updated!" and the field just
+    // empty, with no idea why. The Submit Hostel form already validates
+    // phone numbers with isValidPhoneNumber; this brings Edit Profile in
+    // line with it instead of silently discarding bad input.
+    const trimmedWhatsapp = whatsapp.trim();
+    if (trimmedWhatsapp && !isValidPhoneNumber(trimmedWhatsapp)) {
+      setWhatsappErrorMsg("Enter a valid Ghanaian number, e.g. 0246408602");
+      return;
+    }
+    setWhatsappErrorMsg(undefined);
+
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone && !isValidPhoneNumber(trimmedPhone)) {
+      setPhoneErrorMsg("Enter a valid Ghanaian number, e.g. 0246408602");
+      return;
+    }
+    setPhoneErrorMsg(undefined);
+
     updateProfile.mutate(
       {
         username: trimmedUsername || null,
         bio: bio.trim() || null,
-        whatsappNumber: whatsapp.trim() ? normalizePhoneNumber(whatsapp.trim()) : null,
-        phoneNumber: phone.trim() ? normalizePhoneNumber(phone.trim()) : null,
+        whatsappNumber: trimmedWhatsapp ? normalizePhoneNumber(trimmedWhatsapp) : null,
+        phoneNumber: trimmedPhone ? normalizePhoneNumber(trimmedPhone) : null,
       },
       { onSuccess: () => router.push(`/profile/${user.id}`) }
     );
@@ -114,8 +136,12 @@ export default function EditProfilePage() {
           label="WhatsApp number"
           type="tel"
           value={whatsapp}
-          onChange={(e) => setWhatsapp(e.target.value)}
+          onChange={(e) => {
+            setWhatsapp(e.target.value);
+            if (whatsappErrorMsg) setWhatsappErrorMsg(undefined);
+          }}
           placeholder="e.g. 0246408602"
+          error={whatsappErrorMsg}
           helperText="Other students can message you on WhatsApp"
         />
 
@@ -123,8 +149,12 @@ export default function EditProfilePage() {
           label="Phone number"
           type="tel"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            if (phoneErrorMsg) setPhoneErrorMsg(undefined);
+          }}
           placeholder="e.g. 0246408602"
+          error={phoneErrorMsg}
           helperText="Other students can call you directly"
         />
 

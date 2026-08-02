@@ -157,19 +157,21 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
       // Sign-in failed -- could mean "no account with this email yet"
       // (fine, create one) or "wrong password on an existing account"
       // (not fine). signUp's own response tells them apart -- see
-      // looksLikeExistingAccount. Username is only validated once we're
-      // actually about to attempt a real signup -- an existing user whose
-      // password just doesn't match yet never gets blocked on this field.
+      // looksLikeExistingAccount. Bug fixed here: username used to be
+      // validated *before* this call, blocking with "Choose a username"
+      // on every wrong-password attempt against an existing account --
+      // exactly the case the comment above claims never happens, because
+      // signUp (the only way to actually tell the two cases apart) never
+      // even ran yet. signUp is safe to call speculatively either way --
+      // Supabase's anti-enumeration behavior means calling it for an
+      // email that already has an account creates nothing and sends
+      // nothing, it just reports back an empty identities array.
       const usernameResult = usernameSchema.safeParse(username);
-      if (!usernameResult.success) {
-        setErrors((prev) => ({ ...prev, username: usernameResult.error.issues[0]?.message }));
-        return;
-      }
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { username: usernameResult.data } },
+        options: { data: usernameResult.success ? { username: usernameResult.data } : undefined },
       });
 
       if (looksLikeExistingAccount(signUpError, signUpData?.user)) {
@@ -183,6 +185,12 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
         return;
       }
 
+      // If the username was missing/invalid, the account was still just
+      // created (signUp already ran) with no username set -- rare in
+      // practice since the field is right there on this same form, and
+      // the username nudge banner on /profile catches anyone who lands
+      // here without one, same as any pre-existing account without a
+      // username.
       captureEvent("signed_up");
       if (signUpData.session) {
         showToast({ message: "Welcome to Campa! 🏠", variant: "success" });
@@ -223,7 +231,12 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
           </Button>
         </div>
       ) : (
-        <form onSubmit={handleContinue} className="flex flex-col gap-4">
+        // noValidate -- without it, the browser's own native validation
+        // tooltip for a malformed email pre-empts handleContinue entirely
+        // (the submit event never fires), so the app's own styled "Enter
+        // a valid email" error never gets a chance to show. This form
+        // already validates everything itself.
+        <form onSubmit={handleContinue} noValidate className="flex flex-col gap-4">
           <p className="text-body-sm text-ink-500">{message ?? DEFAULT_SUBTITLE}</p>
 
           <Input

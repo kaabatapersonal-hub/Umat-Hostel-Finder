@@ -391,7 +391,7 @@ export function SubmitHostelForm({ mode = { kind: "create" }, initialValues }: S
 
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-h1 text-ink-900">Tags (optional)</h2>
-        <ChipInput value={form.tags} onChange={(next) => set("tags", next)} placeholder="e.g. near_campus, quiet" />
+        <ChipInput value={form.tags} onChange={(next) => set("tags", next)} placeholder="e.g. Near campus, Quiet" />
       </section>
 
       {formError && <p className="text-body-sm text-danger">{formError}</p>}
