@@ -6,6 +6,8 @@ import { Building2, MessageSquare, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 const SLIDES = [
   {
@@ -31,6 +33,8 @@ export function OnboardingCarousel() {
   const { open, dismiss } = useOnboarding();
   const [index, setIndex] = useState(0);
   const shouldReduceMotion = useReducedMotion();
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
+  useBodyScrollLock(open);
   const isLast = index === SLIDES.length - 1;
   const slide = SLIDES[index];
 
@@ -53,9 +57,11 @@ export function OnboardingCarousel() {
           />
           <div className="fixed inset-0 z-[71] flex items-center justify-center p-4">
             <motion.div
+              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-label="Welcome to Campa"
+              tabIndex={-1}
               initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 8 }}

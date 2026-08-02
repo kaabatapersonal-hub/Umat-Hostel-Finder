@@ -5,6 +5,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
+import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 export interface SheetProps {
   open: boolean;
@@ -21,6 +23,8 @@ export interface SheetProps {
 export function Sheet({ open, onClose, title, children, className }: SheetProps) {
   const shouldReduceMotion = useReducedMotion();
   const keyboardInset = useKeyboardInset();
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
@@ -45,15 +49,17 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             className="fixed inset-0 z-[60] bg-ink-900/50"
           />
           <motion.div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={title}
+            tabIndex={-1}
             initial={shouldReduceMotion ? { opacity: 0 } : { y: "100%", opacity: 0.6 }}
             animate={{ y: 0, opacity: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { y: "100%", opacity: 0.6 }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
-              "fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] overflow-y-auto rounded-t-lg bg-surface p-6 shadow-md",
+              "fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] overflow-y-auto overscroll-contain rounded-t-lg bg-surface p-6 shadow-md",
               className
             )}
             style={{

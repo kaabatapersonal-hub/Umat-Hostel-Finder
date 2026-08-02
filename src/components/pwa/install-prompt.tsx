@@ -4,6 +4,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Share, SquarePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePwaInstallPrompt } from "@/hooks/use-pwa-install-prompt";
+import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 // The same house-in-pin mark as the cold-launch splash (layout.tsx) --
 // one brand icon, not a second logo asset to keep in sync.
@@ -26,6 +28,8 @@ function AppMark() {
 export function InstallPrompt() {
   const { open, platform, install, dismiss } = usePwaInstallPrompt();
   const shouldReduceMotion = useReducedMotion();
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
+  useBodyScrollLock(open);
 
   return (
     <AnimatePresence>
@@ -42,9 +46,11 @@ export function InstallPrompt() {
           />
           <div className="fixed inset-0 z-[71] flex items-center justify-center p-4">
             <motion.div
+              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-label="Install Campa"
+              tabIndex={-1}
               initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 8 }}

@@ -79,7 +79,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
         <PushNotificationToggle />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {isPending ? (
           <div className="flex flex-col gap-2">
             <Skeleton className="h-16 w-full rounded-md" />

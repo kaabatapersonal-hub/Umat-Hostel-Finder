@@ -120,7 +120,7 @@ export function ReplySheet({ post, open, onClose, isAuthorVerified = false, auth
         </>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {repliesQuery.isPending ? (
           <div className="flex flex-col gap-2">
             <Skeleton className="h-16 w-full rounded-md" />

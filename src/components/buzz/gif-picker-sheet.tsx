@@ -44,7 +44,7 @@ export function GifPickerSheet({ open, onClose, onSelect }: GifPickerSheetProps)
         />
       </div>
 
-      <div className="overflow-y-auto">
+      <div className="overflow-y-auto overscroll-contain">
         {isPending ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
