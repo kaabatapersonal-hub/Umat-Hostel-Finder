@@ -209,7 +209,7 @@ export function AuthSheet({ open, onClose, message, onSuccess }: AuthSheetProps)
   }
 
   return (
-    <Sheet open={open} onClose={handleClose} title="Join Campa 🏠">
+    <Sheet open={open} onClose={handleClose} title="Sign In / Join Campa">
       {magicLinkSent ? (
         <div className="flex flex-col gap-4 text-center">
           <p className="text-body text-ink-500">
