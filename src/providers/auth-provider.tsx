@@ -93,6 +93,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  // Backs the win-back digest (see 20260809000000) -- a plain
+  // self-reported "the app was open" timestamp, touched once per
+  // session start, not on every render/navigation. Fire-and-forget: a
+  // failed write here should never affect anything the user can see.
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    supabase.rpc("touch_last_active").then(() => {});
+  }, [user]);
+
   const PROFILE_COLUMNS =
     "id, full_name, email, avatar_url, role, is_suspended, is_verified, verification_label, is_super_admin, admin_permissions, username, bio, whatsapp_number, phone_number, avatar_color";
 

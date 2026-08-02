@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PlaneTakeoff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { useAuth } from "@/providers/auth-provider";
 import { useMyLeavingMode } from "@/hooks/use-my-leaving-mode";
 import { useSetLeavingCampusMode } from "@/hooks/use-set-leaving-campus-mode";
@@ -55,24 +56,11 @@ export function LeavingCampusToggle() {
           </div>
         </div>
 
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          aria-label={enabled ? "Turn off Leaving Campus Sale" : "Turn on Leaving Campus Sale"}
-          onClick={() => setConfirming(enabled ? "off" : "on")}
-          className={cn(
-            "relative h-7 w-12 shrink-0 rounded-full transition-colors",
-            enabled ? "bg-gold-500" : "bg-ink-300"
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 size-6 rounded-full bg-white shadow-md transition-transform",
-              enabled ? "translate-x-[22px]" : "translate-x-0.5"
-            )}
-          />
-        </button>
+        <Toggle
+          checked={enabled}
+          onChange={() => setConfirming(enabled ? "off" : "on")}
+          label={enabled ? "Turn off Leaving Campus Sale" : "Turn on Leaving Campus Sale"}
+        />
       </div>
 
       {confirming && (

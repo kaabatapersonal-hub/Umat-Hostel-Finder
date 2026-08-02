@@ -3113,6 +3113,39 @@ async function main() {
   }
 
   // =====================================================================
+  // Engagement digest notifications: these have NO internal permission
+  // check at all (unlike send_admin_broadcast) -- they blast every non-
+  // suspended user unconditionally, gated entirely on never being
+  // PostgREST-callable in the first place (pg_cron only). Even the real
+  // super admin must be rejected here -- this isn't "admin-only", it's
+  // "nobody, ever, via the API."
+  // =====================================================================
+  section("engagement digest notifications (must be uncallable via API, even by admin)");
+  {
+    const anonDigest = await rpc(null, "send_buzz_digest", {});
+    check("anon cannot call send_buzz_digest", !anonDigest.ok, `status ${anonDigest.status}`);
+    const strangerDigest = await rpc(strangerToken, "send_buzz_digest", {});
+    check("a non-admin cannot call send_buzz_digest", !strangerDigest.ok, `status ${strangerDigest.status}`);
+    const adminDigest = await rpc(adminToken, "send_buzz_digest", {});
+    check("even the super admin cannot call send_buzz_digest directly", !adminDigest.ok, `status ${adminDigest.status}`);
+
+    const anonListings = await rpc(null, "send_new_listings_digest", {});
+    check("anon cannot call send_new_listings_digest", !anonListings.ok, `status ${anonListings.status}`);
+    const adminListings = await rpc(adminToken, "send_new_listings_digest", {});
+    check("even the super admin cannot call send_new_listings_digest directly", !adminListings.ok, `status ${adminListings.status}`);
+
+    const anonWinback = await rpc(null, "send_winback_notifications", {});
+    check("anon cannot call send_winback_notifications", !anonWinback.ok, `status ${anonWinback.status}`);
+    const adminWinback = await rpc(adminToken, "send_winback_notifications", {});
+    check("even the super admin cannot call send_winback_notifications directly", !adminWinback.ok, `status ${adminWinback.status}`);
+
+    const anonTouch = await rpc(null, "touch_last_active", {});
+    check("anon cannot call touch_last_active", !anonTouch.ok, `status ${anonTouch.status}`);
+    const strangerTouch = await rpc(strangerToken, "touch_last_active", {});
+    check("a signed-in user CAN call touch_last_active (updates their own row only)", strangerTouch.ok, JSON.stringify(strangerTouch.body));
+  }
+
+  // =====================================================================
   // Storage: MIME allow-list, size cap, cross-user write scoping
   // =====================================================================
   section("storage");

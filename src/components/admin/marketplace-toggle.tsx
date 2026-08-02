@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { useMarketplaceEnabled } from "@/hooks/use-marketplace-enabled";
 import { useToggleMarketplace } from "@/hooks/use-toggle-marketplace";
 import { cn } from "@/lib/utils";
@@ -54,25 +55,13 @@ export function MarketplaceToggle() {
           </Button>
         </div>
       ) : (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={!!enabled}
-          aria-label={enabled ? "Disable marketplace" : "Enable marketplace"}
-          onClick={() => setConfirming(true)}
+        <Toggle
+          checked={!!enabled}
+          onChange={() => setConfirming(true)}
+          label={enabled ? "Disable marketplace" : "Enable marketplace"}
           disabled={isPending}
-          className={cn(
-            "relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50",
-            enabled ? "bg-brand-600" : "bg-ink-300"
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 size-6 rounded-full bg-white shadow-md transition-transform",
-              enabled ? "translate-x-[22px]" : "translate-x-0.5"
-            )}
-          />
-        </button>
+          activeColorClassName="bg-brand-600"
+        />
       )}
     </div>
   );

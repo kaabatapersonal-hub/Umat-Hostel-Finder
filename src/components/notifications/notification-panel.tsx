@@ -37,6 +37,9 @@ function notificationHref(n: AppNotification): string | null {
     case "admin_report":
       return "/admin/reports";
     case "admin_broadcast":
+    case "buzz_digest":
+    case "new_listings_digest":
+    case "winback":
       return n.linkUrl;
     case "welcome":
     default:

@@ -7,6 +7,7 @@ import { ConditionalAppShell } from "@/components/layout/conditional-app-shell";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { OnboardingCarousel } from "@/components/onboarding/onboarding-carousel";
 import { NotificationsRealtimeSync } from "@/components/notifications/notifications-realtime-sync";
+import { PushPrompt } from "@/components/notifications/push-prompt";
 import { ToastProvider } from "@/components/ui/toast";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -101,6 +102,7 @@ export default function RootLayout({
               <ConditionalAppShell>{children}</ConditionalAppShell>
               <OnboardingCarousel />
               <InstallPrompt />
+              <PushPrompt />
               <NotificationsRealtimeSync />
             </AuthProvider>
           </ToastProvider>

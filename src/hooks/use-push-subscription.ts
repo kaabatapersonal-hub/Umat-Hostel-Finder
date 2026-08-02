@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { savePushSubscription, deletePushSubscription } from "@/lib/queries/push-subscriptions";
 import { useAuth } from "@/providers/auth-provider";
+import { useToast } from "@/components/ui/toast";
 
 type PushSupportStatus = "unsupported" | "default" | "granted" | "denied";
 
@@ -26,6 +27,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 export function usePushSubscription() {
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
+  const { showToast } = useToast();
   const [status, setStatus] = useState<PushSupportStatus>("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -45,17 +47,38 @@ export function usePushSubscription() {
     });
   }, [isSupported]);
 
+  // Every early-return path here used to fail completely silently -- no
+  // toast, no state change, nothing -- which is exactly what made the
+  // toggle look "stuck" or "broken" (a rejected promise from
+  // pushManager.subscribe(), a denied permission prompt, or a missing
+  // VAPID key all looked identical to the user: tap it, nothing happens).
+  // Every path now either succeeds or says why it didn't.
   const subscribe = useCallback(async () => {
-    if (!isSupported || !user) return;
+    if (!isSupported) {
+      showToast({ message: "Notifications aren't supported in this browser.", variant: "error" });
+      return;
+    }
+    if (!user) return;
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidKey) return;
+    if (!vapidKey) {
+      showToast({ message: "Notifications aren't set up yet — try again later.", variant: "error" });
+      return;
+    }
 
     setIsLoading(true);
     try {
       const registration = await navigator.serviceWorker.register("/sw.js");
       const permission = await Notification.requestPermission();
       setStatus(permission as PushSupportStatus);
-      if (permission !== "granted") return;
+      if (permission !== "granted") {
+        if (permission === "denied") {
+          showToast({
+            message: "Notifications are blocked — allow them in your browser's site settings to turn this on.",
+            variant: "error",
+          });
+        }
+        return;
+      }
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -63,7 +86,10 @@ export function usePushSubscription() {
       });
 
       const json = subscription.toJSON();
-      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return;
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+        showToast({ message: "Couldn't turn on notifications — try again.", variant: "error" });
+        return;
+      }
 
       await savePushSubscription(supabase, user.id, {
         endpoint: json.endpoint,
@@ -71,10 +97,13 @@ export function usePushSubscription() {
         auth: json.keys.auth,
       });
       setIsSubscribed(true);
+      showToast({ message: "Notifications turned on!", variant: "success" });
+    } catch {
+      showToast({ message: "Couldn't turn on notifications — try again.", variant: "error" });
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, user, supabase]);
+  }, [isSupported, user, supabase, showToast]);
 
   const unsubscribe = useCallback(async () => {
     if (!isSupported) return;
@@ -87,10 +116,12 @@ export function usePushSubscription() {
         await subscription.unsubscribe();
       }
       setIsSubscribed(false);
+    } catch {
+      showToast({ message: "Couldn't turn off notifications — try again.", variant: "error" });
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, supabase]);
+  }, [isSupported, supabase, showToast]);
 
   return { isSupported, status, isSubscribed, isLoading, subscribe, unsubscribe };
 }

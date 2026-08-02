@@ -1219,6 +1219,10 @@ export interface Database {
         Args: { p_title: string; p_body: string; p_link?: string | null };
         Returns: number;
       };
+      touch_last_active: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
       report_seller_review: {
         Args: { p_review_id: string };
         Returns: undefined;
@@ -1352,7 +1356,10 @@ export type NotificationType =
   | "hostel_update"
   | "admin_report"
   | "welcome"
-  | "admin_broadcast";
+  | "admin_broadcast"
+  | "buzz_digest"
+  | "new_listings_digest"
+  | "winback";
 export type RoommateRequestStatus = "pending" | "accepted" | "declined";
 export type MarketCategory =
   | "hostel_essentials"

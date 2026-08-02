@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { useCreateBuzzPost } from "@/hooks/use-create-buzz-post";
 import { cn } from "@/lib/utils";
 
@@ -48,24 +49,11 @@ export function ComposeBuzzSheet({ open, onClose }: { open: boolean; onClose: ()
             <span className="text-body-sm font-medium text-ink-900">Post anonymously</span>
             <span className="text-caption text-ink-500">Shows as &quot;Student&quot; with no profile link</span>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isAnonymous}
-            aria-label={isAnonymous ? "Turn off anonymous posting" : "Turn on anonymous posting"}
-            onClick={() => setIsAnonymous((v) => !v)}
-            className={cn(
-              "relative h-7 w-12 shrink-0 rounded-full transition-colors",
-              isAnonymous ? "bg-gold-500" : "bg-ink-300"
-            )}
-          >
-            <span
-              className={cn(
-                "absolute top-0.5 size-6 rounded-full bg-white shadow-md transition-transform",
-                isAnonymous ? "translate-x-[22px]" : "translate-x-0.5"
-              )}
-            />
-          </button>
+          <Toggle
+            checked={isAnonymous}
+            onChange={() => setIsAnonymous((v) => !v)}
+            label={isAnonymous ? "Turn off anonymous posting" : "Turn on anonymous posting"}
+          />
         </div>
 
         <div className="flex items-center justify-between">
